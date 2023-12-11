@@ -95,34 +95,41 @@ func parser(tokens []string) {
 
 func parse(sql string) ([]*Table, error) {
 	tokens := lexer(sql)
-	i := 0
 	tables := make([]*Table, 0)
 	for {
-		if i > len(tokens) {
+		tokens = eatNewLines(tokens)
+		if len(tokens) < 1 {
 			break
 		}
-		j, table, err := parseCreateTable(tokens[i:])
+		var table *Table
+		var err error
+		tokens, table, err = parseCreateTable(tokens)
 		if err != nil {
 			return nil, err
 		}
-		i += j
 		tables = append(tables, table)
 	}
 	return tables, nil
 }
 
-func eatNewLines(i int, tokens []string) int {
+// consume N tokens and return the result
+func consume(n int, tokens []string) []string {
+	return tokens[n:] // Consume ONE token
+}
+
+func eatNewLines(tokens []string) []string {
 	for {
-		if i >= len(tokens) {
-			return i
+		if len(tokens) > 0 && tokens[0] == "\n" {
+			tokens = tokens[1:] // Eat whitespace
+			continue
 		}
-		if tokens[i] == "\n" {
-			i += 1 // Eat whitespace
-		} else {
-			break
-		}
+		return tokens
 	}
-	return i
+}
+
+// removeQuotes surrounding the provided string.
+func removeQuotes(name string) string {
+	return strings.Trim(name, `'"`)
 }
 
 type Table struct {
@@ -135,87 +142,85 @@ type Table struct {
 
 // parseCreateTable
 // https://www.sqlite.org/syntax/create-table-stmt.html
-func parseCreateTable(tokens []string) (int, *Table, error) {
-	i := 0
+func parseCreateTable(tokens []string) ([]string, *Table, error) {
 	t := &Table{
 		Temp:        false,
 		IfNotExists: false,
 		Columns:     make([]Column, 0),
 	}
 
-	i = eatNewLines(i, tokens)
-
-	if tokens[i] != "CREATE" {
-		return i, nil, fmt.Errorf("create table must begin with 'CREATE', not %s", tokens[i])
+	if tokens[0] != "CREATE" {
+		return tokens, nil, fmt.Errorf("create table must begin with 'CREATE', not %s", tokens[0])
 	}
-	i += 1 // Eat the token
+	tokens = tokens[1:]
 
 	// Temporary
-	if tokens[i] == "TEMP" || tokens[i] == "TEMPORARY" {
-		i += 1
+	if tokens[0] == "TEMP" || tokens[0] == "TEMPORARY" {
 		t.Temp = true
+		tokens = tokens[1:]
 	}
 
-	if tokens[i] != "TABLE" {
-		return i, nil, fmt.Errorf("create table must begin with 'CREATE [TEMP|TEMPORARY] TABLE', not %s", tokens[0:i])
+	if tokens[0] != "TABLE" {
+		return tokens, nil, fmt.Errorf("create table must begin with 'CREATE [TEMP|TEMPORARY] TABLE', not %s", tokens[0])
 	}
-	i += 1 // Eat the token
+	tokens = tokens[1:]
 
 	// If not exists
-	if tokens[i] == "IF" {
-		if tokens[i+1] == "NOT" && tokens[i+2] == "EXISTS" {
-			i += 3
+	if tokens[0] == "IF" {
+		if tokens[1] == "NOT" && tokens[2] == "EXISTS" {
+			tokens = tokens[3:] // Consume THREE tokens (i.e. IF NOT EXISTS)
 			t.IfNotExists = true
 		} else {
-			return i, nil, fmt.Errorf("create table must use 'IF NOT EXISTS' when 'IF' is present, not %s", tokens[0:i+2])
+			return tokens, nil, fmt.Errorf("create table must use 'IF NOT EXISTS' when 'IF' is present, not %s", tokens[:2])
 		}
 	}
 
 	// Schema and Table Name
-	if tokens[i+1] == "." {
-		t.SchemaName = tokens[i]
-		t.Name = tokens[i+2]
-		i += 3
+	if tokens[1] == "." {
+		t.SchemaName = removeQuotes(tokens[0])
+		t.Name = removeQuotes(tokens[2])
+		tokens = tokens[3:] // Consume THREE tokens (i.e. IF NOT EXISTS)
 	} else {
-		t.Name = tokens[i]
-		i += 1
+		t.Name = removeQuotes(tokens[0])
+		tokens = tokens[1:]
 	}
 
 	// TODO: Handle "AS SELECT STMT" ?
 
-	if tokens[i] == "(" {
-		i += 1
+	// Opening parenthesis for column definitions
+	if tokens[0] == "(" {
+		tokens = tokens[1:]
 	}
 
 	// Comments
-	if tokens[i] == "--" {
-		i += 1
-		for {
+	if tokens[0] == "--" {
+		for i := 1; i < len(tokens); i++ {
 			if tokens[i] == "\n" {
-				i += 1
+				tokens = consume(i+1, tokens) // Consume entire comment to end of line
 				break
-			} else {
-				i += 1 // Consume token as part of comment
 			}
+			// Consume token as part of comment
 		}
 	}
 
 	// Column(s)
 	for {
-		i = eatNewLines(i, tokens)
-		j, col, err := parseColumn(tokens[i:])
-		i += j
+		tokens = eatNewLines(tokens)
+		var col Column
+		var err error
+		tokens, col, err = parseColumn(tokens)
 		if err != nil {
-			return i, nil, err
+			return tokens, nil, err
 		}
 		t.Columns = append(t.Columns, col)
-		if tokens[i] == "," { // End of Column Definition
-			i += 1
+		if tokens[0] == "," { // End of Column Definition (with another to follow)
+			tokens = tokens[1:]
 			continue
-		} else if tokens[i] == ")" { // End of Table Definition
-			i += 1
-			if tokens[i] == ";" { // Optional semicolon
-				i += 1
+		} else if tokens[0] == ")" { // End of Table Definition
+			if tokens[1] == ";" { // Optional semicolon
+				tokens = tokens[2:]
+			} else {
+				tokens = tokens[1:]
 			}
 			break
 		} else {
@@ -223,7 +228,7 @@ func parseCreateTable(tokens []string) (int, *Table, error) {
 		}
 	}
 
-	return i, t, nil
+	return tokens, t, nil
 }
 
 type Column struct {
@@ -234,75 +239,77 @@ type Column struct {
 	Unique     bool
 }
 
-func parseColumn(tokens []string) (int, Column, error) {
-	i := 0
+func parseColumn(tokens []string) ([]string, Column, error) {
 	c := Column{
 		PrimaryKey: false,
 		Nullable:   true,
 		Unique:     false,
 	}
 
-	c.Name = tokens[i]
-	i += 1
+	// Column Name
+	c.Name = removeQuotes(tokens[0])
+	tokens = tokens[1:]
 
-	switch tokens[i] {
+	// Column Type (TODO: Support more than these STRICT MODE types.)
+	switch tokens[0] {
 	case "INT":
 		fallthrough
 	case "INTEGER":
 		c.Type = "int64"
-		i += 1
+		tokens = tokens[1:]
 	case "REAL":
 		c.Type = "float"
-		i += 1
+		tokens = tokens[1:]
 	case "TEXT":
 		c.Type = "string"
-		i += 1
+		tokens = tokens[1:]
 	case "BLOB":
 		fallthrough
 	case "ANY":
 		c.Type = "byte"
-		i += 1
+		tokens = tokens[1:]
 	default:
-		return i, c, fmt.Errorf("column must use a valid type, not %s", tokens[i])
+		return tokens, c, fmt.Errorf("column must use a valid type, not %s", tokens[0])
 	}
 
+	// Column Constraints
 	for {
-		token := tokens[i]
+		token := tokens[0]
 		if token == "," {
 			break // End of column definition. DO NOT CONSUME TOKEN.
 		} else if token == ")" {
 			break // End of table definition. DO NOT CONSUME TOKEN
 		} else if token == "\n" {
-			i += 1 // Eat newline
+			tokens = tokens[1:] // Eat newline
 		} else if token == "NOT" {
-			if tokens[i+1] != "NULL" {
-				return i, c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens[i:i+1])
+			if tokens[1] != "NULL" {
+				return tokens, c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens[:1])
 			}
 			// TODO: Handle [conflict-clause]
 			c.Nullable = false
-			i += 2
+			tokens = tokens[2:] // Consume TWO tokens (i.e. NOT NULL)
 		} else if token == "PRIMARY" {
-			if tokens[i+1] != "KEY" {
-				return i, c, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens[i:i+1])
+			if tokens[1] != "KEY" {
+				return tokens, c, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens[:1])
 			}
 			// TODO: Handle [ASC|DESC] and [conflict-clause]
 			c.PrimaryKey = true
-			i += 2
+			tokens = tokens[2:] // Consume TWO tokens (i.e. PRIMARY KEY)
 		} else if token == "AUTOINCREMENT" {
 			if c.PrimaryKey {
-				i += 1
+				tokens = tokens[1:] // Consume ONE token
 			} else {
-				return i, c, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
+				return tokens, c, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
 			}
 		} else if token == "UNIQUE" {
 			// TODO: Handle [conflict-clause]
 			c.Unique = true
-			i += 1
+			tokens = tokens[1:] // Consume ONE token
 		} else {
-			return i, c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens[i])
+			return tokens, c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens[:5])
 		}
 	}
-	return i, c, nil
+	return tokens, c, nil
 }
 
 func main() {
@@ -311,10 +318,12 @@ func main() {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
 	}
-	t, err := parse(file)
+	tables, err := parse(file)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
 	}
-	fmt.Printf("%+v\n", t)
+	for _, table := range tables {
+		fmt.Printf("%+v\n", table)
+	}
 }
