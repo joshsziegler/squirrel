@@ -103,6 +103,20 @@ func removeQuotes(name string) string {
 	return strings.Trim(name, `'"`)
 }
 
+// parseComment removes the quote starting with the first token, or returns as-is.
+func parseComment(tokens []string) []string {
+	if tokens[0] == "--" {
+		for i := 1; i < len(tokens); i++ {
+			if tokens[i] == "\n" {
+				tokens = consume(i+1, tokens) // Consume entire comment to end of line
+				break
+			}
+			// Consume token as part of comment
+		}
+	}
+	return tokens
+}
+
 // parseCreateTable
 // https://www.sqlite.org/syntax/create-table-stmt.html
 func parseCreateTable(tokens []string) ([]string, *Table, error) {
@@ -156,15 +170,7 @@ func parseCreateTable(tokens []string) ([]string, *Table, error) {
 	}
 
 	// Comments
-	if tokens[0] == "--" {
-		for i := 1; i < len(tokens); i++ {
-			if tokens[i] == "\n" {
-				tokens = consume(i+1, tokens) // Consume entire comment to end of line
-				break
-			}
-			// Consume token as part of comment
-		}
-	}
+	tokens = parseComment(tokens)
 
 	// Column(s)
 	for {
@@ -176,16 +182,19 @@ func parseCreateTable(tokens []string) ([]string, *Table, error) {
 			return tokens, nil, err
 		}
 		t.Columns = append(t.Columns, col)
-		if tokens[0] == "," { // End of Column Definition (with another to follow)
+		token := tokens[0]
+		if token == "," { // End of Column Definition (with another to follow)
 			tokens = tokens[1:]
 			continue
-		} else if tokens[0] == ")" { // End of Table Definition
+		} else if token == ")" { // End of Table Definition
 			if tokens[1] == ";" { // Optional semicolon
 				tokens = tokens[2:]
 			} else {
 				tokens = tokens[1:]
 			}
 			break
+		} else if token == "--" {
+			tokens = parseComment(tokens)
 		} else {
 			break
 		}
@@ -239,6 +248,8 @@ func parseColumn(tokens []string) ([]string, Column, error) {
 			break // End of table definition. DO NOT CONSUME TOKEN
 		} else if token == "\n" {
 			tokens = tokens[1:] // Eat newline
+		} else if token == "--" {
+			tokens = parseComment(tokens) // Eat comment
 		} else if token == "NOT" {
 			if tokens[1] != "NULL" {
 				return tokens, c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens[:1])
