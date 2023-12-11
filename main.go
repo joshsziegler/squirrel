@@ -4,43 +4,27 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 )
 
-var (
-	comment = `(--(?P<comment>.*)$)?`
-	// create-table-stmt: https://www.sqlite.org/syntax/create-table-stmt.html
-	createTableStmt = `CREATE\s+(?P<temp>(?:TEMP|TEMPORARY)\s+)?TABLE\s+(?P<exists>IF NOT EXISTS\s+)?[\'\"]?(?P<name>[a-zA-Z0-9]+)[\'\"]?\s+\(` + comment
-	// column-constraint: https://www.sqlite.org/syntax/column-constraint.html
-	columnConstraint = `(?P<constraint>CONSTRAINT\s+.*)?`
-	// column-def: https://www.sqlite.org/syntax/column-def.html
-	columnDef = `(\s+(?P<colName>\w+)\s+(?P<colType>\w+,?)\s+` + columnConstraint + `,?)+`
-	// table-options: https://www.sqlite.org/syntax/table-options.html
-	tableOptions = `\s+(?P<withoutRowID>WITHOUT ROWID)?(?P<strict>STRICT)?`
-
-	re = regexp.MustCompile(createTableStmt + columnDef + `\s+\)`) //+ tableOptions + `\s+\)`)
-)
-
-func grep(sql string) bool {
-	tables := re.FindAllString(sql, -1)
-	for _, table := range tables {
-		matches := re.FindStringSubmatch(table)
-		tableName := matches[re.SubexpIndex("name")]
-		fmt.Printf("%s\n", tableName)
-
-		colNameIdx := re.SubexpIndex("colName")
-		if colNameIdx >= 0 {
-			colName := matches[colNameIdx]
-			colType := matches[re.SubexpIndex("colType")]
-			fmt.Printf("  - %s %s\n", colName, colType)
-		}
-
-	}
-	return len(tables) > 0
+type Table struct {
+	SchemaName  string
+	Name        string
+	Temp        bool
+	IfNotExists bool
+	Columns     []Column
 }
 
-func read_file(path string) (string, error) {
+type Column struct {
+	Name       string
+	Type       string
+	PrimaryKey bool
+	Nullable   bool
+	Unique     bool
+}
+
+// readFile from disk and return its content as a string.
+func readFile(path string) (string, error) {
 	fileBytes, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -48,8 +32,8 @@ func read_file(path string) (string, error) {
 	return string(fileBytes), nil
 }
 
-// lexer turns a string into tokens.
-func lexer(s string) []string {
+// Lex turns a string containing SQL into tokens, leaving control characters and newlines.
+func Lex(s string) []string {
 	tokens := []string{}
 	lines := strings.Split(s, "\n")
 	for _, line := range lines {
@@ -79,22 +63,24 @@ func lexer(s string) []string {
 	return tokens
 }
 
-func parser(tokens []string) {
-	stmt := ""
-	for i := 0; i < len(tokens); i++ {
-		token := tokens[i]
-		switch token {
-		case "(":
-			fmt.Println(stmt)
-			stmt = ""
-		default:
-			stmt += strings.ToLower(tokens[i])
+// consume N tokens and return the result
+func consume(n int, tokens []string) []string {
+	return tokens[n:] // Consume ONE token
+}
+
+func eatNewLines(tokens []string) []string {
+	for {
+		if len(tokens) > 0 && tokens[0] == "\n" {
+			tokens = tokens[1:] // Eat whitespace
+			continue
 		}
+		return tokens
 	}
 }
 
-func parse(sql string) ([]*Table, error) {
-	tokens := lexer(sql)
+// Parse SQL string to a set of tables with column definitions.
+func Parse(sql string) ([]*Table, error) {
+	tokens := Lex(sql)
 	tables := make([]*Table, 0)
 	for {
 		tokens = eatNewLines(tokens)
@@ -112,32 +98,9 @@ func parse(sql string) ([]*Table, error) {
 	return tables, nil
 }
 
-// consume N tokens and return the result
-func consume(n int, tokens []string) []string {
-	return tokens[n:] // Consume ONE token
-}
-
-func eatNewLines(tokens []string) []string {
-	for {
-		if len(tokens) > 0 && tokens[0] == "\n" {
-			tokens = tokens[1:] // Eat whitespace
-			continue
-		}
-		return tokens
-	}
-}
-
 // removeQuotes surrounding the provided string.
 func removeQuotes(name string) string {
 	return strings.Trim(name, `'"`)
-}
-
-type Table struct {
-	SchemaName  string
-	Name        string
-	Temp        bool
-	IfNotExists bool
-	Columns     []Column
 }
 
 // parseCreateTable
@@ -231,14 +194,7 @@ func parseCreateTable(tokens []string) ([]string, *Table, error) {
 	return tokens, t, nil
 }
 
-type Column struct {
-	Name       string
-	Type       string
-	PrimaryKey bool
-	Nullable   bool
-	Unique     bool
-}
-
+// parseColumn
 func parseColumn(tokens []string) ([]string, Column, error) {
 	c := Column{
 		PrimaryKey: false,
@@ -269,7 +225,9 @@ func parseColumn(tokens []string) ([]string, Column, error) {
 		c.Type = "byte"
 		tokens = tokens[1:]
 	default:
-		return tokens, c, fmt.Errorf("column must use a valid type, not %s", tokens[0])
+		c.Type = tokens[0]
+		tokens = tokens[1:]
+		// return tokens, c, fmt.Errorf("column must use a valid type, not %s", tokens[0])
 	}
 
 	// Column Constraints
@@ -312,18 +270,28 @@ func parseColumn(tokens []string) ([]string, Column, error) {
 	return tokens, c, nil
 }
 
-func main() {
-	file, err := read_file("test.sql")
+func ParseFile(path string) ([]*Table, error) {
+	file, err := readFile(path)
 	if err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		return
+		return nil, err
 	}
-	tables, err := parse(file)
+	tables, err := Parse(file)
 	if err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
-		return
+		return tables, err
+	}
+	return tables, nil
+}
+
+func main() {
+	tables, err := ParseFile("schema.sql")
+	if err != nil {
+		panic(err.Error())
 	}
 	for _, table := range tables {
-		fmt.Printf("%+v\n", table)
+		fmt.Printf("%s %s (IfNotExists: %v, Temp: %v)\n", table.SchemaName, table.Name, table.IfNotExists, table.Temp)
+		for _, col := range table.Columns {
+			fmt.Printf("  - %+v\n", col)
+		}
+
 	}
 }
