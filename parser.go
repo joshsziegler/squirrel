@@ -220,7 +220,16 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			} else {
 				// c.ForeignKey.ColumnName =  // FIXME(JZ): Not specified, so it should be the same name as THIS column name?
 			}
-			// TODO: Handle ON UPDATE/ON DELETE
+			// ON UPDATE/ON DELETE (can have multiple!)
+			for {
+				if tokens.Next() != "ON" {
+					break
+				}
+				err = parseFkAction(tokens, &c)
+				if err != nil {
+					return c, err
+				}
+			}
 		} else if token == "DEFAULT" {
 			tokens.Take()
 			token := tokens.Take()
@@ -251,10 +260,6 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
 		}
 	}
-
-	// TODO: Column Defaults
-
-	// TODO: Column Foreign Key
 
 	return c, nil
 }
@@ -300,6 +305,34 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 		}
 		c.Type = tokens.Next()
 		tokens.Take()
+	}
+	return nil
+}
+
+// TODO: Handle ON (UPDATE|DELETE) RESTRICT
+// TODO: Handle ON (UPDATE|DELETE) NO ACTION
+func parseFkAction(tokens *Tokens, c *Column) error {
+	switch {
+	case tokens.NextN(3) == "ON DELETE CASCADE":
+		tokens.TakeN(3)
+		c.ForeignKey.OnDelete = Cascade
+	case tokens.NextN(3) == "ON UPDATE CASCADE":
+		tokens.TakeN(3)
+		c.ForeignKey.OnUpdate = Cascade
+	case tokens.NextN(4) == "ON DELETE SET NULL":
+		tokens.TakeN(4)
+		c.ForeignKey.OnDelete = SetNull
+	case tokens.NextN(4) == "ON UPDATE SET NULL":
+		tokens.TakeN(4)
+		c.ForeignKey.OnUpdate = SetNull
+	case tokens.NextN(4) == "ON DELETE SET DEFAULT":
+		tokens.TakeN(4)
+		c.ForeignKey.OnDelete = SetDefault
+	case tokens.NextN(4) == "ON UPDATE SET DEFAULT":
+		tokens.TakeN(4)
+		c.ForeignKey.OnUpdate = SetDefault
+	default:
+		return fmt.Errorf("column foreign key constraint \"%s\" not supported", tokens.NextN(4))
 	}
 	return nil
 }

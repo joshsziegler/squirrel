@@ -202,6 +202,49 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{"a Foreign Key specified with inline REFERENCES and ON DELETE ...",
+			`CREATE TABLE boxes (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				name	TEXT NOT NULL UNIQUE
+			);
+			CREATE TABLE franchises (
+				name	TEXT NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE toys (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				name	TEXT NOT NULL,
+				box_id	INTEGER NOT NULL REFERENCES boxes (id) ON DELETE CASCADE,
+				franchise_name	TEXT NOT NULL REFERENCES franchises(name) ON UPDATE CASCADE ON DELETE SET NULL
+			)`,
+			false,
+			[]*Table{
+				{
+					Name: "boxes",
+					Columns: []Column{
+						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
+						{Name: "name", Type: "string", Nullable: false, Unique: true},
+					},
+				},
+				{
+					Name: "franchises",
+					Columns: []Column{
+						{Name: "name", Type: "string", PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					Name: "toys",
+					Columns: []Column{
+						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
+						{Name: "name", Type: "string", Nullable: false, Unique: false},
+						{Name: "box_id", Type: "int64", Nullable: false, ForeignKey: &ForeignKey{Table: "boxes", ColumnName: "id", OnDelete: Cascade}},
+						{Name: "franchise_name", Type: "string", Nullable: false, ForeignKey: &ForeignKey{Table: "franchises", ColumnName: "name", OnUpdate: Cascade, OnDelete: SetNull}},
+					},
+				},
+			},
+		},
+		// FOREIGN KEY(fk_job_id) REFERENCES jobsCache(id) ON DELETE CASCADE
+		// https://www.sqlite.org/syntax/foreign-key-clause.html
+
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

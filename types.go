@@ -79,14 +79,42 @@ type Table struct {
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
+type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
+
+const (
+	NoAction OnFkAction = iota
+	SetNull
+	SetDefault
+	Cascade
+	Restrict
+)
+
+func (a OnFkAction) String() string {
+	switch a {
+	case NoAction:
+		return "NO ACTION"
+	case SetNull:
+		return "SET NULL"
+	case SetDefault:
+		return "SET DEFAULT"
+	case Cascade:
+		return "CASCADE"
+	case Restrict:
+		return "RESTRICT"
+	default:
+		return "UNDEFINED"
+	}
+}
+
 type Column struct {
 	Name       string
 	Type       string
 	PrimaryKey bool
 	Nullable   bool
 	Unique     bool
+	Comment    string // Comment at the end of this column definition if provided.
+
 	ForeignKey *ForeignKey // ForeignKey or null.
-	Comment    string      // Comment at the end of this column definition if provided.
 
 	// Default which can be a constant or expression and is type-dependent.
 	// TODO: Handle expressions
@@ -103,4 +131,6 @@ type ColumnInt struct {
 type ForeignKey struct {
 	Table      string
 	ColumnName string
+	OnUpdate   OnFkAction // OnUpdate action to take (e.g. none, Set Null, Set Default, etc.)
+	OnDelete   OnFkAction // OnDelete action to take (e.g. none, Set Null, Set Default, etc.)
 }
