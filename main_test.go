@@ -202,7 +202,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"a Foreign Key specified with inline REFERENCES and ON DELETE ...",
+		{"a Foreign Key specified with inline REFERENCES and ON DELETE, ON UPDATE, and both ...",
 			`CREATE TABLE boxes (
 				id		INTEGER NOT NULL PRIMARY KEY,
 				name	TEXT NOT NULL UNIQUE
@@ -242,9 +242,43 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		// FOREIGN KEY(fk_job_id) REFERENCES jobsCache(id) ON DELETE CASCADE
-		// https://www.sqlite.org/syntax/foreign-key-clause.html
-
+		{"a Foreign Key specified with without specifying a column name",
+			`CREATE TABLE users (
+				user_id	INTEGER NOT NULL PRIMARY KEY,
+				name	TEXT NOT NULL
+			);
+			CREATE TABLE groups (
+				group_name	TEXT NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE user_group (
+				user_id		INTEGER NOT NULL REFERENCES users, -- Column name is implied by omitting it
+				group_name	TEXT NOT NULL REFERENCES groups
+			);
+			`,
+			false,
+			[]*Table{
+				{
+					Name: "users",
+					Columns: []Column{
+						{Name: "user_id", Type: "int64", PrimaryKey: true, Nullable: false},
+						{Name: "name", Type: "string", Nullable: false},
+					},
+				},
+				{
+					Name: "groups",
+					Columns: []Column{
+						{Name: "group_name", Type: "string", PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					Name: "user_group",
+					Columns: []Column{
+						{Name: "user_id", Type: "int64", Nullable: false, ForeignKey: &ForeignKey{Table: "users", ColumnName: "user_id"}, Comment: "Column name is implied by omitting it"},
+						{Name: "group_name", Type: "string", Nullable: false, ForeignKey: &ForeignKey{Table: "groups", ColumnName: "group_name"}},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

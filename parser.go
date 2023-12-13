@@ -144,7 +144,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 			}
 			break
 		} else if token == "--" {
-			parseComment(tokens)
+			parseComment(tokens) // Comments that are not at the Table or Column level are not saved
 		} else {
 			break
 		}
@@ -208,27 +208,9 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			c.Unique = true
 			tokens.Take() // Consume ONE token
 		} else if token == "REFERENCES" { // Foreign Key
-			if tokens.Peek(1) == "" {
-				return c, fmt.Errorf("column foreign key constraint 'REFERENCES' must be followed by a table name, not %s", tokens.NextN(2))
-			}
-			tokens.Take()
-			// TODO: Handle [conflict-clause]
-			c.ForeignKey = &ForeignKey{Table: tokens.Take()}
-			if tokens.Next() == "(" && tokens.Peek(2) == ")" { // If the column is specified
-				c.ForeignKey.ColumnName = tokens.Peek(1)
-				tokens.TakeN(3)
-			} else {
-				// c.ForeignKey.ColumnName =  // FIXME(JZ): Not specified, so it should be the same name as THIS column name?
-			}
-			// ON UPDATE/ON DELETE (can have multiple!)
-			for {
-				if tokens.Next() != "ON" {
-					break
-				}
-				err = parseFkAction(tokens, &c)
-				if err != nil {
-					return c, err
-				}
+			err = parseForeignKey(tokens, &c)
+			if err != nil {
+				return c, err
 			}
 		} else if token == "DEFAULT" {
 			tokens.Take()
@@ -305,6 +287,33 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 		}
 		c.Type = tokens.Next()
 		tokens.Take()
+	}
+	return nil
+}
+
+// parseForeignKey assumes the Next() token is "REFERENCES" and takes over parsing the rest of the parsing.
+func parseForeignKey(tokens *Tokens, c *Column) error {
+	if tokens.Peek(1) == "" {
+		return fmt.Errorf("column foreign key constraint 'REFERENCES' must be followed by a table name, not %s", tokens.NextN(2))
+	}
+	tokens.Take()
+	// TODO: Handle [conflict-clause]
+	c.ForeignKey = &ForeignKey{Table: tokens.Take()}
+	if tokens.Next() == "(" && tokens.Peek(2) == ")" { // If the column is specified
+		c.ForeignKey.ColumnName = tokens.Peek(1)
+		tokens.TakeN(3)
+	} else {
+		c.ForeignKey.ColumnName = c.Name // Not specified, so it should be the same name as THIS column name.
+	}
+	// ON UPDATE/ON DELETE (can have multiple)
+	for {
+		if tokens.Next() != "ON" {
+			break
+		}
+		err := parseFkAction(tokens, c)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
