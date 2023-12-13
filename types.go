@@ -14,12 +14,26 @@ type Tokens struct {
 	length int
 }
 
-// Next token or return empty string if there are no more tokens.
+// Next token or an empty string if there are no more tokens.
+// This does not "take" the token, so further calls will return the same token.
 func (t *Tokens) Next() string {
 	if t.i < t.length {
 		return t.tokens[t.i]
 	}
 	return ""
+}
+
+// NextN at the N next tokens concatenated together.
+// If there are not n more tokens, returns the remainder (e.g. two tokens returned when three were requested).
+func (t *Tokens) NextN(n int) string {
+	s := ""
+	for j := 0; j < n; j++ {
+		if t.i+j >= t.length {
+			return s
+		}
+		s += t.tokens[t.i+j]
+	}
+	return s
 }
 
 // Nth token from the current index or return an empty string if there are no more tokens.
@@ -42,14 +56,6 @@ func (t *Tokens) TakeN(n int) {
 		t.i += n
 	}
 	return // TODO: What should I do if there are NOT n more tokens?
-}
-
-// Peek at the N next tokens, or nil if there are not N more tokens.
-func (t *Tokens) Peek(n int) []string {
-	if t.i+n < t.length {
-		return t.tokens[t.i : t.i+n]
-	}
-	return nil
 }
 
 type Table struct {

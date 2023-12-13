@@ -88,7 +88,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 			tokens.TakeN(3)
 			t.IfNotExists = true
 		} else {
-			return nil, fmt.Errorf("create table must use 'IF NOT EXISTS' when 'IF' is present, not %v", tokens.Peek(3))
+			return nil, fmt.Errorf("create table must use 'IF NOT EXISTS' when 'IF' is present, not %s", tokens.NextN(3))
 		}
 	}
 
@@ -191,14 +191,14 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			parseComment(tokens) // Eat comment
 		} else if token == "NOT" {
 			if tokens.Nth(1) != "NULL" {
-				return c, fmt.Errorf("column constraint must be 'NOT NULL', not %v", tokens.Peek(2))
+				return c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
 			}
 			// TODO: Handle [conflict-clause]
 			c.Nullable = false
 			tokens.TakeN(2)
 		} else if token == "PRIMARY" {
 			if tokens.Nth(1) != "KEY" {
-				return c, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.Peek(2))
+				return c, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
 			}
 			// TODO: Handle [ASC|DESC] and [conflict-clause]
 			c.PrimaryKey = true
@@ -214,7 +214,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			c.Unique = true
 			tokens.Take() // Consume ONE token
 		} else {
-			return c, fmt.Errorf("unrecognized column constraint starting with: %v", tokens.Peek(5))
+			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
 		}
 	}
 	return c, nil
