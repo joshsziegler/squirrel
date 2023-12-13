@@ -154,28 +154,10 @@ func parseColumn(tokens *Tokens) (Column, error) {
 	c.Name = removeQuotes(tokens.Next())
 	tokens.Take()
 
-	// Column Type (TODO: Support more than these STRICT MODE types.)
-	switch tokens.Next() {
-	case "INT":
-		fallthrough
-	case "INTEGER":
-		c.Type = "int64"
-		tokens.Take()
-	case "REAL":
-		c.Type = "float"
-		tokens.Take()
-	case "TEXT":
-		c.Type = "string"
-		tokens.Take()
-	case "BLOB":
-		fallthrough
-	case "ANY":
-		c.Type = "byte"
-		tokens.Take()
-	default:
-		c.Type = tokens.Next()
-		tokens.Take()
-		// return c, fmt.Errorf("column must use a valid type, not %s", tokens.Next())
+	// Column Data Type
+	err := parseColumnDataType(tokens, &c, false)
+	if err != nil {
+		return c, err
 	}
 
 	// Column Constraints
@@ -217,5 +199,50 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
 		}
 	}
+
+	// TODO: Column Defaults
+
+	// TODO: Column Foreign Key
+
 	return c, nil
+}
+
+// Column Type
+// - strict: Only support SQLite's STRICT data types (i.e. INT, INTEGER, REAL, TEXT, BLOB, ANY).
+//
+// SQLite Docs: https://www.sqlite.org/datatype3.html
+// mattn/go-sqlit3 Docs: https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Supported_Types
+func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
+	switch tokens.Next() {
+	case "INT":
+		fallthrough
+	case "INTEGER":
+		c.Type = "int64"
+		tokens.Take()
+	case "FLOAT": // TODO: This isn't a valid SQLite type.
+		fallthrough
+	case "REAL":
+		c.Type = "float64"
+		tokens.Take()
+	case "TEXT":
+		c.Type = "string"
+		tokens.Take()
+	case "BLOB":
+		fallthrough
+	case "ANY":
+		c.Type = "[]byte"
+		tokens.Take()
+	case "DATETIME":
+		fallthrough
+	case "TIMESTAMP":
+		c.Type = "time.Time"
+		tokens.Take()
+	default:
+		if strict {
+			return fmt.Errorf("column must use a valid type, not %s", tokens.Next())
+		}
+		c.Type = tokens.Next()
+		tokens.Take()
+	}
+	return nil
 }

@@ -112,10 +112,10 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{Name: "name", Type: "string", PrimaryKey: true, Nullable: false},
 						{Name: "age", Type: "int64", Nullable: false},
-						{Name: "weight", Type: "float", Nullable: false},
+						{Name: "weight", Type: "float64", Nullable: false},
 						{Name: "height", Type: "int64", Nullable: false},
-						{Name: "photo", Type: "byte", Nullable: true},
-						{Name: "data", Type: "byte", Nullable: true},
+						{Name: "photo", Type: "[]byte", Nullable: true},
+						{Name: "data", Type: "[]byte", Nullable: true},
 					},
 				},
 			},
