@@ -39,9 +39,9 @@ func (t *Tokens) NextN(n int) string {
 	return strings.Join(s, " ")
 }
 
-// Nth token from the current index or return an empty string if there are no more tokens.
+// Peek at the nth token from the current index or return an empty string if it does not exist.
 // This does not "take" the token, so further calls will return the same token.
-func (t *Tokens) Nth(n int) string {
+func (t *Tokens) Peek(n int) string {
 	j := t.i + n
 	if j < t.length {
 		return t.tokens[j]
@@ -50,16 +50,21 @@ func (t *Tokens) Nth(n int) string {
 }
 
 // Take the next token (i.e. claim/consume it).
+// Does nothing if there are no more tokens.
 func (t *Tokens) Take() {
-	t.i += 1 // TODO: What should I do if there are NOT n more tokens?
+	if t.i < t.length {
+		t.i += 1
+	}
 }
 
+// Take the next N tokens (i.e. claim/consume them).
+// Stops when there are no more tokens to take.
 func (t *Tokens) TakeN(n int) {
 	j := t.i + n
 	if j < t.length {
 		t.i += n
 	}
-	return // TODO: What should I do if there are NOT n more tokens?
+	return
 }
 
 type Table struct {

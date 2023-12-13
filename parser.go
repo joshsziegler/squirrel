@@ -93,9 +93,9 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 	}
 
 	// Schema and Table Name (i.e. Schema.TableName)
-	if tokens.Nth(1) == "." {
+	if tokens.Peek(1) == "." {
 		t.SchemaName = removeQuotes(tokens.Next())
-		t.Name = removeQuotes(tokens.Nth(2))
+		t.Name = removeQuotes(tokens.Peek(2))
 		tokens.TakeN(3)
 	} else {
 		t.Name = removeQuotes(tokens.Next())
