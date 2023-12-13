@@ -51,10 +51,13 @@ func (t *Tokens) Peek(n int) string {
 
 // Take the next token (i.e. claim/consume it).
 // Does nothing if there are no more tokens.
-func (t *Tokens) Take() {
+func (t *Tokens) Take() string {
+	token := ""
 	if t.i < t.length {
+		token = t.tokens[t.i]
 		t.i += 1
 	}
+	return token
 }
 
 // Take the next N tokens (i.e. claim/consume them).
@@ -82,5 +85,11 @@ type Column struct {
 	PrimaryKey bool
 	Nullable   bool
 	Unique     bool
-	Comment    string // Comment at the end of this column definition if provided.
+	ForeignKey *ForeignKey // ForeignKey or null.
+	Comment    string      // Comment at the end of this column definition if provided.
+}
+
+type ForeignKey struct {
+	Table      string
+	ColumnName string
 }

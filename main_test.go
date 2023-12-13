@@ -136,6 +136,24 @@ func TestParse(t *testing.T) {
 			true,
 			[]*Table{},
 		},
+		{"basic table with a Foreign Key specified with inline REFERENCES",
+			`CREATE TABLE people (
+				id		INT NOT NULL PRIMARY KEY,
+				name	TEXT NOT NULL, -- Name may not be unique!
+				spouse	INT REFERENCES people(id) -- Husband or Wife within this table
+			);`,
+			false,
+			[]*Table{
+				{
+					Name: "people",
+					Columns: []Column{
+						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
+						{Name: "name", Type: "string", Nullable: false, Comment: "Name may not be unique!"},
+						{Name: "spouse", Type: "int64", Nullable: true, ForeignKey: &ForeignKey{Table: "people", ColumnName: "id"}, Comment: "Husband or Wife within this table"},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

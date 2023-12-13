@@ -200,6 +200,19 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			// TODO: Handle [conflict-clause]
 			c.Unique = true
 			tokens.Take() // Consume ONE token
+		} else if token == "REFERENCES" { // Foreign Key
+			if tokens.Peek(1) == "" {
+				return c, fmt.Errorf("column foreign key constraint 'REFERENCES' must be followed by a table name, not %s", tokens.NextN(2))
+			}
+			tokens.Take()
+			// TODO: Handle [conflict-clause]
+			c.ForeignKey = &ForeignKey{Table: tokens.Take()}
+			if tokens.Next() == "(" && tokens.Peek(2) == ")" { // If the column is specified
+				c.ForeignKey.ColumnName = tokens.Peek(1)
+				tokens.TakeN(3)
+			} else {
+				// c.ForeignKey.ColumnName =  // FIXME(JZ): Not specified, so it should be the same name as THIS column name?
+			}
 		} else {
 			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
 		}
