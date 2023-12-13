@@ -1,4 +1,4 @@
-module github.com/joshsziegler/sqlizer
+module github.com/joshsziegler/squirrel
 
 go 1.21.4
 
