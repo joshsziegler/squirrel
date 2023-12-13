@@ -1,5 +1,7 @@
 package main
 
+import "strings"
+
 func NewTokens(tokens []string) *Tokens {
 	return &Tokens{
 		i:      0,
@@ -24,19 +26,21 @@ func (t *Tokens) Next() string {
 }
 
 // NextN at the N next tokens concatenated together.
+// This does not "take" the token, so further calls will return the same tokens.
 // If there are not n more tokens, returns the remainder (e.g. two tokens returned when three were requested).
 func (t *Tokens) NextN(n int) string {
-	s := ""
+	s := make([]string, 0)
 	for j := 0; j < n; j++ {
 		if t.i+j >= t.length {
-			return s
+			break
 		}
-		s += t.tokens[t.i+j]
+		s = append(s, t.tokens[t.i+j])
 	}
-	return s
+	return strings.Join(s, " ")
 }
 
 // Nth token from the current index or return an empty string if there are no more tokens.
+// This does not "take" the token, so further calls will return the same token.
 func (t *Tokens) Nth(n int) string {
 	j := t.i + n
 	if j < t.length {

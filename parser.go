@@ -84,7 +84,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 
 	// If not exists
 	if tokens.Next() == "IF" {
-		if tokens.Nth(1) == "NOT" && tokens.Nth(2) == "EXISTS" {
+		if tokens.NextN(3) == "IF NOT EXISTS" {
 			tokens.TakeN(3)
 			t.IfNotExists = true
 		} else {
@@ -190,14 +190,14 @@ func parseColumn(tokens *Tokens) (Column, error) {
 		} else if token == "--" {
 			parseComment(tokens) // Eat comment
 		} else if token == "NOT" {
-			if tokens.Nth(1) != "NULL" {
+			if tokens.NextN(2) != "NOT NULL" {
 				return c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
 			}
 			// TODO: Handle [conflict-clause]
 			c.Nullable = false
 			tokens.TakeN(2)
 		} else if token == "PRIMARY" {
-			if tokens.Nth(1) != "KEY" {
+			if tokens.NextN(2) != "PRIMARY KEY" {
 				return c, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
 			}
 			// TODO: Handle [ASC|DESC] and [conflict-clause]
