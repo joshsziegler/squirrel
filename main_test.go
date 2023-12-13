@@ -174,11 +174,15 @@ func TestParse(t *testing.T) {
 		},
 		{"default value as a constant string",
 			`CREATE TABLE product (
-				id			INT NOT NULL PRIMARY KEY,
-				name		TEXT NOT NULL UNIQUE,
-				type		TEXT NOT NULL DEFAULT "software",
-				description	TEXT NOT NULL DEFAULT "", -- Empty string as the default
-				discontinued BOOL NOT NULL DEFAULT false
+				id				INT		NOT NULL	PRIMARY KEY,
+				name			TEXT	NOT NULL	UNIQUE,
+				type			TEXT	NOT NULL	DEFAULT "software",
+				description		TEXT	NOT NULL	DEFAULT "", -- Empty string as the default
+				discontinued	BOOL	NOT NULL	DEFAULT FALSE,
+				on_sale			BOOLEAN				DEFAULT 1, -- true using integer notation
+				magic			BOOL				DEFAULT TRUE,
+				stolen			BOOL				DEFAULT false,
+				intelligent		BOOL				DEFAULT 0
 			);`,
 			false,
 			[]*Table{
@@ -187,9 +191,13 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
 						{Name: "name", Type: "string", Nullable: false, Unique: true},
-						{Name: "type", Type: "string", Nullable: false, Default: "software"},
-						{Name: "description", Type: "string", Nullable: false, Default: "", Comment: "Empty string as the default"},
-						{Name: "discontinued", Type: "bool", Nullable: false, Default: "false"},
+						{Name: "type", Type: "string", Nullable: false, DefaultString: "software"},
+						{Name: "description", Type: "string", Nullable: false, DefaultString: "", Comment: "Empty string as the default"},
+						{Name: "discontinued", Type: "bool", Nullable: false, DefaultBool: false},
+						{Name: "on_sale", Type: "bool", Nullable: true, DefaultBool: true, Comment: "true using integer notation"},
+						{Name: "magic", Type: "bool", Nullable: true, DefaultBool: true},
+						{Name: "stolen", Type: "bool", Nullable: true, DefaultBool: false},
+						{Name: "intelligent", Type: "bool", Nullable: true, DefaultBool: false},
 					},
 				},
 			},

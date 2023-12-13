@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -219,13 +220,33 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			} else {
 				// c.ForeignKey.ColumnName =  // FIXME(JZ): Not specified, so it should be the same name as THIS column name?
 			}
+			// TODO: Handle ON UPDATE/ON DELETE
 		} else if token == "DEFAULT" {
 			tokens.Take()
 			token := tokens.Take()
 			if token == "" {
 				return c, fmt.Errorf("column DEFAULT must be followed by a constant value or expression, not %s", token)
 			}
-			c.Default = removeQuotes(token)
+			switch c.Type {
+			case "int64":
+				c.DefaultInt, err = strconv.ParseInt(token, 10, 64) // Should not have quotes
+				if err != nil {
+					return c, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer, not %s", token)
+				}
+			case "string":
+				c.DefaultString = removeQuotes(token)
+			case "bool":
+				switch token {
+				case "true", "TRUE", "1":
+					c.DefaultBool = true
+				case "false", "FALSE", "0":
+					c.DefaultBool = false
+				default:
+					return c, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
+				}
+			default:
+				return c, fmt.Errorf("default values for %s type are not supported", c.Type)
+			}
 		} else {
 			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
 		}

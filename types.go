@@ -86,8 +86,18 @@ type Column struct {
 	Nullable   bool
 	Unique     bool
 	ForeignKey *ForeignKey // ForeignKey or null.
-	Default    string      // Default value if it is a constant. TODO: Handle non-strings and expressions.
 	Comment    string      // Comment at the end of this column definition if provided.
+
+	// Default which can be a constant or expression and is type-dependent.
+	// TODO: Handle expressions
+	DefaultString string
+	DefaultInt    int64
+	DefaultBool   bool
+}
+
+type ColumnInt struct {
+	Column
+	Default int64
 }
 
 type ForeignKey struct {
