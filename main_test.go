@@ -75,7 +75,8 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "foo",
+					Name:    "foo",
+					Comment: "Hello world!",
 					Columns: []Column{
 						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
 					},
@@ -84,14 +85,19 @@ func TestParse(t *testing.T) {
 		},
 		{"basic table with comments at end of a column line",
 			`CREATE TABLE bars (
-				name TEXT NOT NULL UNIQUE -- name of the bar
+				name TEXT NOT NULL UNIQUE, -- name of the bar
+				open INTEGER,
+				close INTEGER -- Hour (1-24) the bar closes if known
 			);`,
 			false,
 			[]*Table{
 				{
 					Name: "bars",
 					Columns: []Column{
-						{Name: "name", Type: "string", PrimaryKey: false, Nullable: false, Unique: true},
+						{Name: "name", Type: "string", PrimaryKey: false, Nullable: false, Unique: true, Comment: "name of the bar"},
+						{Name: "open", Type: "int64", PrimaryKey: false, Nullable: true, Unique: false},
+						// FIXME: Lexer/Parser turns this comment from "(1-24)" to "( 1-24 )"
+						{Name: "close", Type: "int64", PrimaryKey: false, Nullable: true, Unique: false, Comment: "Hour ( 1-24 ) the bar closes if known"},
 					},
 				},
 			},
@@ -102,6 +108,7 @@ func TestParse(t *testing.T) {
 				age INT NOT NULL,
 				weight REAL NOT NULL,
 				height INTEGER NOT NULL,
+				last_seen DATETIME,
 				photo BLOB,
 				data ANY
 			);`,
@@ -114,11 +121,20 @@ func TestParse(t *testing.T) {
 						{Name: "age", Type: "int64", Nullable: false},
 						{Name: "weight", Type: "float64", Nullable: false},
 						{Name: "height", Type: "int64", Nullable: false},
+						{Name: "last_seen", Type: "time.Time", Nullable: true},
 						{Name: "photo", Type: "[]byte", Nullable: true},
 						{Name: "data", Type: "[]byte", Nullable: true},
 					},
 				},
 			},
+		},
+		{"basic table with invalid column type 'INTERGER'",
+			`CREATE TABLE jobs (
+				id TEXT UNIQUE NOT NULL,
+				user_id INTERGER NOT NULL
+			);`,
+			true,
+			[]*Table{},
 		},
 	}
 	for _, tt := range tests {

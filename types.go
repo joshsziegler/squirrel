@@ -73,6 +73,7 @@ type Table struct {
 	Temp        bool
 	IfNotExists bool
 	Columns     []Column
+	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
 type Column struct {
@@ -81,4 +82,5 @@ type Column struct {
 	PrimaryKey bool
 	Nullable   bool
 	Unique     bool
+	Comment    string // Comment at the end of this column definition if provided.
 }

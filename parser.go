@@ -45,16 +45,20 @@ func removeQuotes(name string) string {
 }
 
 // parseComment removes the quote starting with the first token, or returns as-is.
-func parseComment(tokens *Tokens) {
+func parseComment(tokens *Tokens) string {
+	comment := make([]string, 0)
 	if tokens.Next() == "--" {
+		tokens.Take()
 		for {
-			if tokens.Next() == "\n" {
+			t := tokens.Next()
+			if t == "\n" {
 				break
 			}
+			comment = append(comment, t)
 			tokens.Take() // Consume token as part of comment
 		}
 	}
-	return
+	return strings.Join(comment, " ")
 }
 
 // parseCreateTable
@@ -110,7 +114,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 	}
 
 	// Comments
-	parseComment(tokens)
+	t.Comment = parseComment(tokens)
 
 	// Column(s)
 	for {
@@ -125,6 +129,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 		token := tokens.Next()
 		if token == "," { // End of Column Definition (with another to follow)
 			tokens.Take()
+			t.Columns[len(t.Columns)-1].Comment = parseComment(tokens)
 			continue
 		} else if token == ")" { // End of Table Definition
 			tokens.Take()
@@ -150,17 +155,17 @@ func parseColumn(tokens *Tokens) (Column, error) {
 		Unique:     false,
 	}
 
-	// Column Name
+	// Name
 	c.Name = removeQuotes(tokens.Next())
 	tokens.Take()
 
-	// Column Data Type
-	err := parseColumnDataType(tokens, &c, false)
+	// Data Type
+	err := parseColumnDataType(tokens, &c, true)
 	if err != nil {
 		return c, err
 	}
 
-	// Column Constraints
+	// Constraints
 	for {
 		token := tokens.Next()
 		if token == "," {
@@ -170,7 +175,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 		} else if token == "\n" {
 			tokens.Take() // Eat newline
 		} else if token == "--" {
-			parseComment(tokens) // Eat comment
+			c.Comment = parseComment(tokens)
 		} else if token == "NOT" {
 			if tokens.NextN(2) != "NOT NULL" {
 				return c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
