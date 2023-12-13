@@ -3,7 +3,7 @@ package main
 import "strings"
 
 // Lex turns a string containing SQL into tokens, leaving control characters and newlines.
-func Lex(s string) []string {
+func Lex(s string) *Tokens {
 	tokens := []string{}
 	lines := strings.Split(s, "\n")
 	for _, line := range lines {
@@ -30,5 +30,5 @@ func Lex(s string) []string {
 		}
 		tokens = append(tokens, "\n") // Add explicit newline for line-dependent semantics, like comments
 	}
-	return tokens
+	return NewTokens(tokens)
 }
