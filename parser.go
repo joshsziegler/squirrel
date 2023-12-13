@@ -45,6 +45,11 @@ func removeQuotes(name string) string {
 }
 
 // parseComment removes the quote starting with the first token, or returns as-is.
+//
+// SQLite Docs: https://www.sqlite.org/lang_comment.html
+//
+// TODO: Handle multi-line comments.
+// TODO: Handle comments anywhere whitespace may occur, per the SQLite specification.
 func parseComment(tokens *Tokens) string {
 	comment := make([]string, 0)
 	if tokens.Next() == "--" {
@@ -166,6 +171,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 	}
 
 	// Constraints
+	// SQlite Docs: https://www.sqlite.org/syntax/column-constraint.html
 	for {
 		token := tokens.Next()
 		if token == "," {
@@ -213,6 +219,13 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			} else {
 				// c.ForeignKey.ColumnName =  // FIXME(JZ): Not specified, so it should be the same name as THIS column name?
 			}
+		} else if token == "DEFAULT" {
+			tokens.Take()
+			token := tokens.Take()
+			if token == "" {
+				return c, fmt.Errorf("column DEFAULT must be followed by a constant value or expression, not %s", token)
+			}
+			c.Default = removeQuotes(token)
 		} else {
 			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
 		}
@@ -236,6 +249,11 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 		fallthrough
 	case "INTEGER":
 		c.Type = "int64"
+		tokens.Take()
+	case "BOOL":
+		fallthrough
+	case "BOOLEAN": // SQLite does not have a bool or boolean type and represents them as integers (0 and 1) internally.
+		c.Type = "bool"
 		tokens.Take()
 	case "FLOAT": // TODO: This isn't a valid SQLite type.
 		fallthrough

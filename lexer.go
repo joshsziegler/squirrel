@@ -8,7 +8,8 @@ func Lex(s string) *Tokens {
 	lines := strings.Split(s, "\n")
 	for _, line := range lines {
 		token := ""
-		for _, ch := range line {
+		for j := 0; j < len(line); j++ {
+			ch := line[j]
 			switch ch {
 			case ' ', '	': // space or tab
 				if token != "" {
@@ -21,6 +22,18 @@ func Lex(s string) *Tokens {
 					token = ""
 				}
 				tokens = append(tokens, string(ch))
+			case '-': // Comment delimiter
+				if len(line) > j+1 && line[j+1] == '-' {
+					if token != "" { //  Append previous token if any
+						tokens = append(tokens, token, "--")
+						token = ""
+					} else {
+						tokens = append(tokens, "--")
+					}
+					j += 1 // Skip ahead to compensate for both characters
+					continue
+				}
+				fallthrough // Not a comment delimiter
 			default:
 				token += string(ch)
 			}

@@ -36,7 +36,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table with numeric ID primary key, but nullable unique name",
+		{"numeric ID primary key, but nullable unique name",
 			`CREATE TABLE users (
 				id INT PRIMARY KEY NOT NULL AUTOINCREMENT,
 				name TEXT UNIQUE
@@ -52,7 +52,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table with integer number of nodes and semicolon at end of definition",
+		{"integer number of nodes and semicolon at end of definition",
 			`CREATE TABLE jobs (
 				id INT PRIMARY KEY NOT NULL AUTOINCREMENT,
 				num_nodes INTEGER
@@ -68,7 +68,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table with quotes table name and comments at end of the CREATE TABLE line",
+		{"quotes table name and comments at end of the CREATE TABLE line",
 			`CREATE TABLE "foo" ( -- Hello world!
 				id INT PRIMARY KEY NOT NULL AUTOINCREMENT
 			);`,
@@ -83,7 +83,25 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table with comments at end of a column line",
+		{"bugs due to spacing between comment delimiter and comment text",
+			`CREATE TABLE comments (
+				foo TEXT, --no space between delimiter and first word
+				bar TEXT,-- no space after comma ending the column definition
+				baz TEXT--No space on either side
+			);`,
+			false,
+			[]*Table{
+				{
+					Name: "comments",
+					Columns: []Column{
+						{Name: "foo", Type: "string", Nullable: true, Comment: "no space between delimiter and first word"},
+						{Name: "bar", Type: "string", Nullable: true, Comment: "no space after comma ending the column definition"},
+						{Name: "baz", Type: "string", Nullable: true, Comment: "No space on either side"},
+					},
+				},
+			},
+		},
+		{"comments at end of a column line",
 			`CREATE TABLE bars (
 				name TEXT NOT NULL UNIQUE, -- name of the bar
 				open INTEGER,
@@ -102,7 +120,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table with every data type supported by STRICT",
+		{"every data type supported by STRICT",
 			`CREATE TABLE animals (
 				name TEXT PRIMARY KEY NOT NULL,
 				age INT NOT NULL,
@@ -128,7 +146,7 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table with invalid column type 'INTERGER'",
+		{"invalid column type 'INTERGER'",
 			`CREATE TABLE jobs (
 				id TEXT UNIQUE NOT NULL,
 				user_id INTERGER NOT NULL
@@ -136,7 +154,7 @@ func TestParse(t *testing.T) {
 			true,
 			[]*Table{},
 		},
-		{"basic table with a Foreign Key specified with inline REFERENCES",
+		{"a Foreign Key specified with inline REFERENCES",
 			`CREATE TABLE people (
 				id		INT NOT NULL PRIMARY KEY,
 				name	TEXT NOT NULL, -- Name may not be unique!
@@ -150,6 +168,28 @@ func TestParse(t *testing.T) {
 						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
 						{Name: "name", Type: "string", Nullable: false, Comment: "Name may not be unique!"},
 						{Name: "spouse", Type: "int64", Nullable: true, ForeignKey: &ForeignKey{Table: "people", ColumnName: "id"}, Comment: "Husband or Wife within this table"},
+					},
+				},
+			},
+		},
+		{"default value as a constant string",
+			`CREATE TABLE product (
+				id			INT NOT NULL PRIMARY KEY,
+				name		TEXT NOT NULL UNIQUE,
+				type		TEXT NOT NULL DEFAULT "software",
+				description	TEXT NOT NULL DEFAULT "", -- Empty string as the default
+				discontinued BOOL NOT NULL DEFAULT false
+			);`,
+			false,
+			[]*Table{
+				{
+					Name: "product",
+					Columns: []Column{
+						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
+						{Name: "name", Type: "string", Nullable: false, Unique: true},
+						{Name: "type", Type: "string", Nullable: false, Default: "software"},
+						{Name: "description", Type: "string", Nullable: false, Default: "", Comment: "Empty string as the default"},
+						{Name: "discontinued", Type: "bool", Nullable: false, Default: "false"},
 					},
 				},
 			},
