@@ -279,6 +279,85 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{"named-constraint-with-multi-column-primary-key",
+			`CREATE TABLE IF NOT EXISTS "albums" (
+			 artist        TEXT NOT NULL,
+			 album_title   TEXT NOT NULL,
+			 year          INT NOT NULL,
+			 CONSTRAINT author_book PRIMARY KEY (artist, album_title) --
+			)
+			`,
+			false,
+			[]*Table{
+				{
+					Name: "albums",
+					Columns: []Column{
+						{Name: "artist", Type: "string", PrimaryKey: false, Nullable: false},
+						{Name: "album_title", Type: "string", PrimaryKey: false, Nullable: false},
+						{Name: "year", Type: "int64", PrimaryKey: false, Nullable: false},
+					},
+				},
+			},
+		},
+		{"unnamed-unique-constraint",
+			`CREATE TABLE IF NOT EXISTS "players" (
+			 server        INT NOT NULL,
+			 character_name   TEXT NOT NULL,
+			 UNIQUE (server, character_name) -- Names must be unique PER SERVER
+			)
+			`,
+			false,
+			[]*Table{
+				{
+					Name: "players",
+					Columns: []Column{
+						{Name: "server", Type: "int64", PrimaryKey: false, Nullable: false},
+						{Name: "character_name", Type: "string", PrimaryKey: false, Nullable: false},
+					},
+				},
+			},
+		},
+		{"foreign-key-on-own-line-to-single-column",
+			`CREATE TABLE IF NOT EXISTS "albums" (
+			 artist TEXT NOT NULL,
+			 name   TEXT NOT NULL,
+			 year   INT,
+			 FOREIGN KEY (artist) ON DELETE CASCADE-- Link back to the artist table and delete if artist is deleted
+			)
+			`,
+			false,
+			[]*Table{
+				{
+					Name: "albums",
+					Columns: []Column{
+						{Name: "artist", Type: "string", PrimaryKey: false, Nullable: false},
+						{Name: "name", Type: "string", PrimaryKey: false, Nullable: false},
+						{Name: "year", Type: "int64", PrimaryKey: false, Nullable: true},
+					},
+				},
+			},
+		},
+		{"indices-on-simple-table",
+			`CREATE TABLE users (
+				name TEXT NOT NULL PRIMARY KEY,
+				email TEXT NOT NULL,
+				role TEXT NOT NULL
+			)
+			CREATE INDEX idx_users_email ON users(email);
+			CREATE INDEX idx_users_role ON users(role);
+		`,
+			false,
+			[]*Table{
+				{
+					Name: "users",
+					Columns: []Column{
+						{Name: "name", Type: "string", PrimaryKey: true, Nullable: false},
+						{Name: "email", Type: "string"},
+						{Name: "role", Type: "string"},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
