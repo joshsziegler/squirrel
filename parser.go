@@ -12,7 +12,7 @@ func consume(n int, tokens []string) []string {
 	return tokens[n:] // Consume ONE token
 }
 
-func eatNewLines(tokens *Tokens) {
+func consumeNewLines(tokens *Tokens) {
 	for {
 		if tokens.Next() == "\n" {
 			tokens.Take()
@@ -27,7 +27,7 @@ func Parse(sql string) ([]*Table, error) {
 	tokens := Lex(sql)
 	tables := make([]*Table, 0)
 	for {
-		eatNewLines(tokens)
+		consumeNewLines(tokens)
 		if tokens.Next() == "" {
 			break
 		}
@@ -124,7 +124,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 
 	// Column(s)
 	for {
-		eatNewLines(tokens)
+		consumeNewLines(tokens)
 		var col Column
 		var err error
 		col, err = parseColumn(tokens)
