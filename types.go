@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 func NewTokens(tokens []string) *Tokens {
 	return &Tokens{
@@ -68,6 +71,15 @@ func (t *Tokens) TakeN(n int) {
 		t.i += n
 	}
 	return
+}
+
+// Return the last token (opposite of Take()).
+func (t *Tokens) Return() {
+	if t.i == 0 {
+		fmt.Println("Error: Tried returning past zero")
+		return
+	}
+	t.i -= 1
 }
 
 type Table struct {
