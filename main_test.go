@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -191,13 +192,13 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
 						{Name: "name", Type: "string", Nullable: false, Unique: true},
-						{Name: "type", Type: "string", Nullable: false, DefaultString: "software"},
-						{Name: "description", Type: "string", Nullable: false, DefaultString: "", Comment: "Empty string as the default"},
-						{Name: "discontinued", Type: "bool", Nullable: false, DefaultBool: false},
-						{Name: "on_sale", Type: "bool", Nullable: true, DefaultBool: true, Comment: "true using integer notation"},
-						{Name: "magic", Type: "bool", Nullable: true, DefaultBool: true},
-						{Name: "stolen", Type: "bool", Nullable: true, DefaultBool: false},
-						{Name: "intelligent", Type: "bool", Nullable: true, DefaultBool: false},
+						{Name: "type", Type: "string", Nullable: false, DefaultString: sql.NullString{Valid: true, String: "software"}},
+						{Name: "description", Type: "string", Nullable: false, DefaultString: sql.NullString{Valid: true, String: ""}, Comment: "Empty string as the default"},
+						{Name: "discontinued", Type: "bool", Nullable: false, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+						{Name: "on_sale", Type: "bool", Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: true}, Comment: "true using integer notation"},
+						{Name: "magic", Type: "bool", Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: true}},
+						{Name: "stolen", Type: "bool", Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+						{Name: "intelligent", Type: "bool", Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
 					},
 				},
 			},

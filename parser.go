@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"strconv"
@@ -239,20 +240,27 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			switch c.Type {
 			case "int64":
 				token := tokens.Take()
-				c.DefaultInt, err = strconv.ParseInt(token, 10, 64) // Should not have quotes
-				if err != nil {
-					return c, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer, not %s", token)
+				if token != "NULL" { // TODO: How to mark explicitly as DEFAULTS TO NULL?
+					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
+					if err != nil {
+						return c, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
+					}
+					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
 				}
 			case "string":
-				token := tokens.Take()
-				c.DefaultString = removeQuotes(token)
+				if token != "NULL" {
+					token := tokens.Take()
+					c.DefaultString = sql.NullString{Valid: true, String: removeQuotes(token)}
+				}
 			case "bool":
 				token := tokens.Take()
 				switch token {
+				case "NULL":
+					// TODO: How to mark explicitly as DEFAULTS TO NULL?
 				case "true", "TRUE", "1":
-					c.DefaultBool = true
+					c.DefaultBool = sql.NullBool{Valid: true, Bool: true}
 				case "false", "FALSE", "0":
-					c.DefaultBool = false
+					c.DefaultBool = sql.NullBool{Valid: true, Bool: false}
 				default:
 					return c, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
 				}

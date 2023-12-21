@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 )
@@ -139,9 +140,9 @@ type Column struct {
 
 	// Default which can be a constant or expression and is type-dependent.
 	// TODO: Handle expressions
-	DefaultString string
-	DefaultInt    int64
-	DefaultBool   bool
+	DefaultString sql.NullString
+	DefaultInt    sql.NullInt64
+	DefaultBool   sql.NullBool
 }
 
 type ColumnInt struct {
