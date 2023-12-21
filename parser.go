@@ -7,42 +7,37 @@ import (
 	"strings"
 )
 
-// consume N tokens and return the result
-func consume(n int, tokens []string) []string {
-	return tokens[n:] // Consume ONE token
-}
-
-func consumeNewLines(tokens *Tokens) {
-	for {
-		if tokens.Next() == "\n" {
-			tokens.Take()
-			continue
-		}
-		return
-	}
-}
-
 // Parse SQL string to a set of tables with column definitions.
 func Parse(sql string) ([]*Table, error) {
 	tokens := Lex(sql)
 	tables := make([]*Table, 0)
 	for {
-		consumeNewLines(tokens)
-		if tokens.Next() == "" {
-			break
+		switch {
+		case tokens.Next() == "\n":
+			tokens.Take()
+		case tokens.Next() == "": // End of SQL
+			return tables, nil
+
+		case tokens.Next() == "CREATE":
+			table, err := parseCreateTable(tokens)
+			if err != nil {
+				return nil, err
+			}
+			tables = append(tables, table)
 		}
-		table, err := parseCreateTable(tokens)
-		if err != nil {
-			return nil, err
-		}
-		tables = append(tables, table)
 	}
-	return tables, nil
 }
 
-// removeQuotes surrounding the provided string.
-func removeQuotes(name string) string {
-	return strings.Trim(name, `'"`)
+// removeQuotes surrounding the provided string -- both single and double quotes -- but only if they match.
+func removeQuotes(s string) string {
+	l := len(s)
+	if l < 2 {
+		return s
+	}
+	if (s[0] == '"' && s[l-1] == '"') || (s[0] == '\'' && s[l-1] == '\'') {
+		return s[1 : l-1]
+	}
+	return s
 }
 
 // parseComment removes the quote starting with the first token, or returns as-is.
@@ -371,7 +366,7 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 func parseTableConstraint(tokens *Tokens) error {
 	name := ""
 	switch {
-	case tokens.Next() == "CONSTRAINT": // Named table constraint
+	case tokens.Next() == "CONSTRAINT": // Named table constraint (which is optional)
 		name = tokens.Take()
 		fmt.Printf("Constraint: %s\n", tokens.Take())
 	case tokens.NextN(2) == "PRIMARY KEY": // table-constraint
