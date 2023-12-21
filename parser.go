@@ -18,12 +18,20 @@ func Parse(sql string) ([]*Table, error) {
 		case tokens.Next() == "": // End of SQL
 			return tables, nil
 
-		case tokens.Next() == "CREATE":
+		case tokens.NextN(2) == "CREATE TABLE": // FIXME: This won't catch TEMPORARY or TEMP
 			table, err := parseCreateTable(tokens)
 			if err != nil {
 				return nil, err
 			}
 			tables = append(tables, table)
+		case tokens.NextN(2) == "CREATE INDEX": // FIXME: This won't catch UNIQUE indices
+			// https://www.sqlite.org/syntax/create-index-stmt.html
+			err := parseCreateIndex(tokens)
+			if err != nil {
+				return nil, err
+			}
+		default:
+			return nil, fmt.Errorf("unsupported statement starting with: %s", tokens.NextN(3))
 		}
 	}
 }
@@ -421,4 +429,42 @@ func parseColumnList(tokens *Tokens) []string {
 		t = tokens.Next()
 	}
 	return cols
+}
+
+// create-index-stmt
+// https://www.sqlite.org/syntax/create-index-stmt.html
+func parseCreateIndex(tokens *Tokens) error {
+	if tokens.Take() != "CREATE" {
+		return fmt.Errorf("create index must begin with \"CREATE [UNIQUE] INDEX\", not \"%s\"", tokens.NextN(3))
+	}
+	if tokens.Next() == "UNIQUE" {
+		tokens.Take()
+	}
+	if tokens.Take() != "INDEX" {
+		return fmt.Errorf("create index must begin with \"CREATE [UNIQUE] INDEX\", not \"%s\"", tokens.NextN(3))
+	}
+	if tokens.NextN(3) == "IF NOT EXISTS" {
+		tokens.TakeN(3)
+	}
+	name := tokens.Take()
+	if strings.Contains(name, ".") {
+		parts := strings.SplitN(name, ".", 2) // FIXME: Assumes there is only one period
+		fmt.Printf("Schema Name: %s, Index Name: %s", parts[0], parts[1])
+	}
+	if tokens.Take() != "ON" {
+		tokens.Return()
+		return fmt.Errorf("create index must be followed by \"ON table-name\", not \"%s\"", tokens.NextN(2))
+	}
+	tableName := tokens.Take()
+	cols := parseColumnList(tokens)
+	if cols == nil {
+		return fmt.Errorf("create index must be followed by one or more columns, not \"%s\"", tokens.NextN(3))
+	}
+	// TODO: Handle WHERE expr
+	if tokens.Next() == ";" { // Optional(?) closing semicolon
+		tokens.Take()
+	}
+	fmt.Printf("Index: %s ON %s (%v)", name, tableName, cols)
+	return nil
+
 }
