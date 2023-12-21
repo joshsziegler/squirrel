@@ -325,15 +325,21 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 // TODO: Handle rest of foreign-key-clause, including MATCH, [NOT] DEFERRABLE, and multiple columns
 func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 	fk := &ForeignKey{}
-	// if tokens.Take() != "REFERENCES" {
-	// 	tokens.Return()
-	// 	return nil, fmt.Errorf("foreign key clause must start with 'REFERENCES table-name', not %s", tokens.NextN(2))
-	// }
 	cols := parseColumnList(tokens)
 	if len(cols) > 1 {
 		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
 	}
-	fk.ColumnName = cols[0]
+	fk.ColumnName = cols[0] // FROM-COLUMN
+	if tokens.Take() != "REFERENCES" {
+		tokens.Return()
+		return nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
+	}
+	fk.Table = tokens.Take() // table-name
+	cols = parseColumnList(tokens)
+	if len(cols) > 1 {
+		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
+	}
+	// cols[0] // TO COLUMN
 	err := parseFkAction(tokens, fk)
 	if err != nil {
 		return nil, err
@@ -391,7 +397,6 @@ func parseTableConstraint(tokens *Tokens) error {
 	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
 		tokens.TakeN(2)
 		// TODO: Handle foreign-key-clause
-		// cols := parseColumnList(tokens)
 		fk, err := parseForeignKeyClause(tokens)
 		if err != nil {
 			return err

@@ -324,7 +324,7 @@ func TestParse(t *testing.T) {
 			 artist TEXT NOT NULL,
 			 name   TEXT NOT NULL,
 			 year   INT,
-			 FOREIGN KEY (artist) ON DELETE CASCADE-- Link back to the artist table and delete if artist is deleted
+			 FOREIGN KEY (artist) REFERENCES artist (name) ON DELETE CASCADE-- Link back to the artist table and delete if artist is deleted
 			)
 			`,
 			false,
@@ -335,6 +335,25 @@ func TestParse(t *testing.T) {
 						{Name: "artist", Type: "string", PrimaryKey: false, Nullable: false},
 						{Name: "name", Type: "string", PrimaryKey: false, Nullable: false},
 						{Name: "year", Type: "int64", PrimaryKey: false, Nullable: true},
+					},
+				},
+			},
+		},
+		{"foreign key on own line",
+			` CREATE TABLE job_extended_attrs (
+				fk_job_id TEXT NOT NULL,
+				auto_extend INTEGER NOT NULL,
+				PRIMARY KEY (fk_job_id),
+				FOREIGN KEY(fk_job_id) REFERENCES jobsCache(id) ON DELETE CASCADE
+			)
+		`,
+			false,
+			[]*Table{
+				{
+					Name: "job_extended_attrs",
+					Columns: []Column{
+						{Name: "fk_job_id", Type: "string", PrimaryKey: false, Nullable: false},
+						{Name: "auto_extend", Type: "int64", Nullable: false},
 					},
 				},
 			},
