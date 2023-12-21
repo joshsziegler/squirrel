@@ -290,7 +290,8 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "albums",
+					Name:        "albums",
+					IfNotExists: true,
 					Columns: []Column{
 						{Name: "artist", Type: "string", PrimaryKey: false, Nullable: false},
 						{Name: "album_title", Type: "string", PrimaryKey: false, Nullable: false},
@@ -309,7 +310,8 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "players",
+					Name:        "players",
+					IfNotExists: true,
 					Columns: []Column{
 						{Name: "server", Type: "int64", PrimaryKey: false, Nullable: false},
 						{Name: "character_name", Type: "string", PrimaryKey: false, Nullable: false},
@@ -318,7 +320,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{"foreign-key-on-own-line-to-single-column",
-			`CREATE TABLE IF NOT EXISTS "albums" (
+			`CREATE TABLE "albums" (
 			 artist TEXT NOT NULL,
 			 name   TEXT NOT NULL,
 			 year   INT,

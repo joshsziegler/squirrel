@@ -76,22 +76,17 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 		Columns:     make([]Column, 0),
 	}
 
-	if tokens.Next() != "CREATE" {
+	if tokens.Take() != "CREATE" {
 		return nil, fmt.Errorf("create table must begin with 'CREATE', not %s", tokens.Next())
 	}
-	tokens.Take()
-
 	// Temporary
 	if tokens.Next() == "TEMP" || tokens.Next() == "TEMPORARY" {
 		t.Temp = true
 		tokens.Take()
 	}
-
-	if tokens.Next() != "TABLE" {
+	if tokens.Take() != "TABLE" {
 		return nil, fmt.Errorf("create table must begin with 'CREATE [TEMP|TEMPORARY] TABLE', not %s", tokens.Next())
 	}
-	tokens.Take()
-
 	// If not exists
 	if tokens.Next() == "IF" {
 		if tokens.NextN(3) == "IF NOT EXISTS" {
@@ -101,56 +96,57 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 			return nil, fmt.Errorf("create table must use 'IF NOT EXISTS' when 'IF' is present, not %s", tokens.NextN(3))
 		}
 	}
-
 	// Schema and Table Name (i.e. Schema.TableName)
 	if tokens.Peek(1) == "." {
-		t.SchemaName = removeQuotes(tokens.Next())
-		t.Name = removeQuotes(tokens.Peek(2))
-		tokens.TakeN(3)
+		t.SchemaName = removeQuotes(tokens.Take())
+		tokens.Take() // period delimiter
+		t.Name = removeQuotes(tokens.Take())
 	} else {
-		t.Name = removeQuotes(tokens.Next())
-		tokens.Take()
+		t.Name = removeQuotes(tokens.Take())
 	}
-
 	// TODO: Handle "AS SELECT STMT" ?
-
 	// Opening parenthesis for column definitions
 	if tokens.Next() == "(" {
 		tokens.Take()
 	}
-
 	// Comments
 	t.Comment = parseComment(tokens)
 
 	// Column(s)
 	for {
-		consumeNewLines(tokens)
-		var col Column
-		var err error
-		col, err = parseColumn(tokens)
-		if err != nil {
-			return nil, err
-		}
-		t.Columns = append(t.Columns, col)
-		token := tokens.Next()
-		if token == "," { // End of Column Definition (with another to follow)
-			tokens.Take()
-			t.Columns[len(t.Columns)-1].Comment = parseComment(tokens)
-			continue
-		} else if token == ")" { // End of Table Definition
+		switch tokens.Next() {
+		case ")": // End of Table Definition
 			tokens.Take()
 			if tokens.Next() == ";" { // Optional semicolon
 				tokens.Take()
 			}
-			break
-		} else if token == "--" {
-			parseComment(tokens) // Comments that are not at the Table or Column level are not saved
-		} else {
-			break
+			return t, nil
+		case "": // Table wasn't closed properly or something went wrong
+			return nil, fmt.Errorf("ran out of tokens unexpectedly - table was likely not closed properly")
+		case "\n": // Newline
+			tokens.Take()
+		case ",":
+			tokens.Take()
+		case "--": // Comment
+			parseComment(tokens)
+		case "CONSTRAINT": // Named table constraint
+			parseTableConstraint(tokens)
+		case "PRIMARY": // table-constraint
+			parseTableConstraint(tokens)
+		case "UNIQUE": // table-constraint
+			parseTableConstraint(tokens)
+		case "CHECK": // table-constraint
+			parseTableConstraint(tokens)
+		case "FOREIGN": // table-constraint
+			parseTableConstraint(tokens)
+		default: // column-def
+			col, err := parseColumn(tokens)
+			if err != nil {
+				return nil, err
+			}
+			t.Columns = append(t.Columns, col)
 		}
 	}
-
-	return t, nil
 }
 
 // parseColumn
@@ -162,25 +158,26 @@ func parseColumn(tokens *Tokens) (Column, error) {
 	}
 
 	// Name
-	c.Name = removeQuotes(tokens.Next())
-	tokens.Take()
-
+	c.Name = removeQuotes(tokens.Take())
 	// Data Type
 	err := parseColumnDataType(tokens, &c, true)
 	if err != nil {
 		return c, err
 	}
-
 	// Constraints
 	// SQlite Docs: https://www.sqlite.org/syntax/column-constraint.html
 	for {
 		token := tokens.Next()
-		if token == "," {
-			break // End of column definition. DO NOT CONSUME TOKEN.
-		} else if token == ")" {
-			break // End of table definition. DO NOT CONSUME TOKEN
+		if token == "," { // End of Column Definition (check for optional comment)
+			tokens.Take()
+			if tokens.Next() == "--" {
+				c.Comment = parseComment(tokens)
+			}
+			break
+		} else if token == ")" { // End of table definition. DO NOT CONSUME TOKEN
+			break
 		} else if token == "\n" {
-			tokens.Take() // Eat newline
+			tokens.Take()
 		} else if token == "--" {
 			c.Comment = parseComment(tokens)
 		} else if token == "NOT" {
@@ -283,7 +280,7 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 		tokens.Take()
 	default:
 		if strict {
-			return fmt.Errorf("column must use a valid type, not %s", tokens.Next())
+			return fmt.Errorf("column '%s' must use a valid type, not %s", c.Name, tokens.Next())
 		}
 		c.Type = tokens.Next()
 		tokens.Take()
@@ -310,7 +307,7 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 		if tokens.Next() != "ON" {
 			break
 		}
-		err := parseFkAction(tokens, c)
+		err := parseFkAction(tokens, c.ForeignKey)
 		if err != nil {
 			return err
 		}
@@ -318,30 +315,115 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 	return nil
 }
 
+// foreign-key-clause
+// Note this is different from an inline FK definition, and can reference multiple columns.
+// https://www.sqlite.org/syntax/foreign-key-clause.html
+//
+// TODO: Handle rest of foreign-key-clause, including MATCH, [NOT] DEFERRABLE, and multiple columns
+func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
+	fk := &ForeignKey{}
+	// if tokens.Take() != "REFERENCES" {
+	// 	tokens.Return()
+	// 	return nil, fmt.Errorf("foreign key clause must start with 'REFERENCES table-name', not %s", tokens.NextN(2))
+	// }
+	cols := parseColumnList(tokens)
+	if len(cols) > 1 {
+		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
+	}
+	fk.ColumnName = cols[0]
+	err := parseFkAction(tokens, fk)
+	if err != nil {
+		return nil, err
+	}
+	return fk, nil
+}
+
 // TODO: Handle ON (UPDATE|DELETE) RESTRICT
 // TODO: Handle ON (UPDATE|DELETE) NO ACTION
-func parseFkAction(tokens *Tokens, c *Column) error {
+func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 	switch {
 	case tokens.NextN(3) == "ON DELETE CASCADE":
 		tokens.TakeN(3)
-		c.ForeignKey.OnDelete = Cascade
+		fk.OnDelete = Cascade
 	case tokens.NextN(3) == "ON UPDATE CASCADE":
 		tokens.TakeN(3)
-		c.ForeignKey.OnUpdate = Cascade
+		fk.OnUpdate = Cascade
 	case tokens.NextN(4) == "ON DELETE SET NULL":
 		tokens.TakeN(4)
-		c.ForeignKey.OnDelete = SetNull
+		fk.OnDelete = SetNull
 	case tokens.NextN(4) == "ON UPDATE SET NULL":
 		tokens.TakeN(4)
-		c.ForeignKey.OnUpdate = SetNull
+		fk.OnUpdate = SetNull
 	case tokens.NextN(4) == "ON DELETE SET DEFAULT":
 		tokens.TakeN(4)
-		c.ForeignKey.OnDelete = SetDefault
+		fk.OnDelete = SetDefault
 	case tokens.NextN(4) == "ON UPDATE SET DEFAULT":
 		tokens.TakeN(4)
-		c.ForeignKey.OnUpdate = SetDefault
+		fk.OnUpdate = SetDefault
 	default:
 		return fmt.Errorf("column foreign key constraint \"%s\" not supported", tokens.NextN(4))
 	}
 	return nil
+}
+
+// table-constraint
+// https://www.sqlite.org/syntax/table-constraint.html
+func parseTableConstraint(tokens *Tokens) error {
+	name := ""
+	switch {
+	case tokens.Next() == "CONSTRAINT": // Named table constraint
+		name = tokens.Take()
+		fmt.Printf("Constraint: %s\n", tokens.Take())
+	case tokens.NextN(2) == "PRIMARY KEY": // table-constraint
+		tokens.TakeN(2) // PRIMARY KEY
+		cols := parseIndexedColumn(tokens)
+		// TODO: Handle conflict clause
+		fmt.Printf("Primary Key '%s' Columns: %v\n", name, cols)
+	case tokens.Next() == "UNIQUE": // table-constraint
+		tokens.Take()
+		cols := parseIndexedColumn(tokens)
+		// TODO: Handle conflict clause
+		fmt.Printf("Unique '%s' Columns %v\n", name, cols)
+	case tokens.Next() == "CHECK": // table-constraint
+	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
+		tokens.TakeN(2)
+		// TODO: Handle foreign-key-clause
+		// cols := parseColumnList(tokens)
+		fk, err := parseForeignKeyClause(tokens)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Foreign Key '%s' Foreign Key: %+v\n", name, fk)
+	}
+	return nil
+}
+
+// indexed-column
+// https://www.sqlite.org/syntax/indexed-column.html
+// TODO: Handle rest of indexed-column, and not just column list: [expr] [COLLATION collation-name] [ASC|DESC]
+func parseIndexedColumn(tokens *Tokens) []string {
+	return parseColumnList(tokens)
+}
+
+// ( column [, column]+ )
+// TODO: Handle [expr] [COLLATION collation-name] [ASC|DESC]
+func parseColumnList(tokens *Tokens) []string {
+	if tokens.Take() != "(" {
+		tokens.Return()
+		return nil
+	}
+	cols := []string{}
+	t := tokens.Next()
+	for {
+		if t == ")" { // End of column list
+			tokens.Take()
+			break
+		} else if t == "," { // Column Separator
+			tokens.Take()
+		} else { // Column Name
+			cols = append(cols, tokens.Take())
+		}
+		t = tokens.Next()
+	}
+	return cols
 }
