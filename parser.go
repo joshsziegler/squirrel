@@ -21,6 +21,7 @@ func Parse(sql string) ([]*Table, error) {
 		case tokens.NextN(2) == "CREATE TABLE": // FIXME: This won't catch TEMPORARY or TEMP
 			table, err := parseCreateTable(tokens)
 			if err != nil {
+				printContext(tokens, err)
 				return nil, err
 			}
 			tables = append(tables, table)
@@ -28,11 +29,32 @@ func Parse(sql string) ([]*Table, error) {
 			// https://www.sqlite.org/syntax/create-index-stmt.html
 			err := parseCreateIndex(tokens)
 			if err != nil {
+				printContext(tokens, err)
 				return nil, err
 			}
 		default:
-			return nil, fmt.Errorf("unsupported statement starting with: %s", tokens.NextN(3))
+			err := fmt.Errorf("unsupported statement: %s", tokens.NextN(3))
+			printContext(tokens, err)
+			return nil, err
 		}
+	}
+}
+
+func printContext(tokens *Tokens, err error) {
+	tokens.ReturnN(10)
+	fmt.Println(err)
+	fmt.Println("...")
+	fmt.Println(tokens.NextN(20))
+	fmt.Println("...")
+}
+
+func removeNewlines(tokens *Tokens) {
+	for {
+		if tokens.Next() == "\n" {
+			tokens.Take()
+			continue
+		}
+		return
 	}
 }
 
@@ -214,19 +236,18 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			}
 		} else if token == "DEFAULT" {
 			tokens.Take()
-			token := tokens.Take()
-			if token == "" {
-				return c, fmt.Errorf("column DEFAULT must be followed by a constant value or expression, not %s", token)
-			}
 			switch c.Type {
 			case "int64":
+				token := tokens.Take()
 				c.DefaultInt, err = strconv.ParseInt(token, 10, 64) // Should not have quotes
 				if err != nil {
 					return c, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer, not %s", token)
 				}
 			case "string":
+				token := tokens.Take()
 				c.DefaultString = removeQuotes(token)
 			case "bool":
+				token := tokens.Take()
 				switch token {
 				case "true", "TRUE", "1":
 					c.DefaultBool = true
@@ -235,6 +256,8 @@ func parseColumn(tokens *Tokens) (Column, error) {
 				default:
 					return c, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
 				}
+			case "time.Time":
+				parseDatetimeDefault(tokens)
 			default:
 				return c, fmt.Errorf("default values for %s type are not supported", c.Type)
 			}
@@ -330,6 +353,7 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
 	}
 	fk.ColumnName = cols[0] // FROM-COLUMN
+	removeNewlines(tokens)
 	if tokens.Take() != "REFERENCES" {
 		tokens.Return()
 		return nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
@@ -373,6 +397,26 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 		return fmt.Errorf("column foreign key constraint \"%s\" not supported", tokens.NextN(4))
 	}
 	return nil
+}
+
+func parseDatetimeDefault(tokens *Tokens) {
+	value := ""
+	paren := 0
+	for {
+		t := tokens.Take()
+		value += t
+		if t == "(" {
+			paren += 1
+		} else if t == ")" {
+			paren -= 1
+			if paren == 0 {
+				break
+			}
+		} else {
+			// ignore
+		}
+	}
+	fmt.Printf("ignoring default value: %s\n", value)
 }
 
 // table-constraint

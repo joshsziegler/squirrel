@@ -379,6 +379,25 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{"datetime with default value of now",
+			`CREATE TABLE "login_attempts" (
+				id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+				ip   TEXT NOT NULL,
+				time DATETIME NOT NULL DEFAULT (datetime('now'))
+			)
+		`,
+			false,
+			[]*Table{
+				{
+					Name: "login_attempts",
+					Columns: []Column{
+						{Name: "id", Type: "int64", PrimaryKey: true, Nullable: false},
+						{Name: "ip", Type: "string", Nullable: false},
+						{Name: "time", Type: "time.Time", Nullable: false},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

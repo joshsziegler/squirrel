@@ -82,6 +82,15 @@ func (t *Tokens) Return() {
 	t.i -= 1
 }
 
+// Return the last N token (opposite of TakeN()).
+func (t *Tokens) ReturnN(n int) {
+	if t.i-n < 0 {
+		fmt.Println("Error: Tried returning past zero")
+		return
+	}
+	t.i -= n
+}
+
 type Table struct {
 	SchemaName  string
 	Name        string

@@ -27,7 +27,7 @@ func ParseFile(path string) ([]*Table, error) {
 }
 
 func main() {
-	tables, err := ParseFile("test.sql")
+	tables, err := ParseFile("schema.sql")
 	if err != nil {
 		panic(err.Error())
 	}
