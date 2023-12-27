@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/joshsziegler/zgo/pkg/log"
 )
 
 // Parse SQL string to a set of tables with column definitions.
@@ -410,11 +412,10 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 }
 
 func parseDatetimeDefault(tokens *Tokens) {
-	value := ""
+	value := []string{}
 	paren := 0
 	for {
 		t := tokens.Take()
-		value += t
 		if t == "(" {
 			paren += 1
 		} else if t == ")" {
@@ -424,9 +425,10 @@ func parseDatetimeDefault(tokens *Tokens) {
 			}
 		} else {
 			// ignore
+			value = append(value, t)
 		}
 	}
-	fmt.Printf("ignoring default value: %s\n", value)
+	log.Debugf("[IGNORED] DateTime Default: %s\n", strings.Join(value, " "))
 }
 
 // table-constraint
@@ -436,17 +438,17 @@ func parseTableConstraint(tokens *Tokens) error {
 	switch {
 	case tokens.Next() == "CONSTRAINT": // Named table constraint (which is optional)
 		name = tokens.Take()
-		fmt.Printf("Constraint: %s\n", tokens.Take())
+		log.Debugf("[IGNORED] Table Constraint Constraint: %s", tokens.Take())
 	case tokens.NextN(2) == "PRIMARY KEY": // table-constraint
 		tokens.TakeN(2) // PRIMARY KEY
 		cols := parseIndexedColumn(tokens)
 		// TODO: Handle conflict clause
-		fmt.Printf("Primary Key '%s' Columns: %v\n", name, cols)
+		log.Debugf("[IGNORED] Table Constraint Primary Key '%s' Columns: %v", name, cols)
 	case tokens.Next() == "UNIQUE": // table-constraint
 		tokens.Take()
 		cols := parseIndexedColumn(tokens)
 		// TODO: Handle conflict clause
-		fmt.Printf("Unique '%s' Columns %v\n", name, cols)
+		log.Debugf("[IGNORED] Table Constraint Unique '%s' Columns %v", name, cols)
 	case tokens.Next() == "CHECK": // table-constraint
 		parseCheckConstraint(tokens)
 	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
@@ -456,7 +458,7 @@ func parseTableConstraint(tokens *Tokens) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Foreign Key '%s' Foreign Key: %+v\n", name, fk)
+		log.Debugf("[IGNORED] Table Constraint Foreign Key Named '%s' --: %+v\n", name, fk)
 	}
 	return nil
 }
@@ -509,7 +511,7 @@ func parseCreateIndex(tokens *Tokens) error {
 	name := tokens.Take()
 	if strings.Contains(name, ".") {
 		parts := strings.SplitN(name, ".", 2) // FIXME: Assumes there is only one period
-		fmt.Printf("Schema Name: %s, Index Name: %s", parts[0], parts[1])
+		log.Debugf("[IGNORED] Index which specified a Schema Name: %s, and Index Name: %s", parts[0], parts[1])
 	}
 	if tokens.Take() != "ON" {
 		tokens.Return()
@@ -524,7 +526,7 @@ func parseCreateIndex(tokens *Tokens) error {
 	if tokens.Next() == ";" { // Optional(?) closing semicolon
 		tokens.Take()
 	}
-	fmt.Printf("Index: %s ON %s (%v)", name, tableName, cols)
+	log.Debugf("Index: %s ON %s (%v)", name, tableName, cols)
 	return nil
 
 }
@@ -551,7 +553,7 @@ func parseCheckConstraint(tokens *Tokens) {
 			value = append(value, tokens.Take())
 		}
 	}
-	fmt.Printf("Ignoring CHECK constraints: %s", strings.Join(value, " "))
+	log.Debugf("[IGNORED] CHECK constraint: %s", strings.Join(value, " "))
 }
 
 func parseExpression(tokens *Tokens) {
