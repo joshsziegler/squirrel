@@ -235,6 +235,8 @@ func parseColumn(tokens *Tokens) (Column, error) {
 			if err != nil {
 				return c, err
 			}
+		} else if token == "CHECK" { // CHECK column constraint
+			parseCheckConstraint(tokens)
 		} else if token == "DEFAULT" {
 			tokens.Take()
 			switch c.Type {
@@ -446,27 +448,7 @@ func parseTableConstraint(tokens *Tokens) error {
 		// TODO: Handle conflict clause
 		fmt.Printf("Unique '%s' Columns %v\n", name, cols)
 	case tokens.Next() == "CHECK": // table-constraint
-		// FIXME: Infinite Loop because we aren't handling this
-		tokens.Take()
-		value := []string{}
-		paren := 0
-		for {
-			t := tokens.Next()
-			if t == "(" {
-				tokens.Take()
-				paren += 1
-			} else if t == ")" {
-				tokens.Take()
-				paren -= 1
-				if paren < 1 {
-					break // End of CHECK EXPRESSION
-				}
-			} else {
-				// Unsupported token
-				value = append(value, tokens.Take())
-			}
-		}
-		fmt.Printf("Ignoring CHECK: %s", strings.Join(value, " "))
+		parseCheckConstraint(tokens)
 	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
 		tokens.TakeN(2)
 		// TODO: Handle foreign-key-clause
@@ -545,4 +527,33 @@ func parseCreateIndex(tokens *Tokens) error {
 	fmt.Printf("Index: %s ON %s (%v)", name, tableName, cols)
 	return nil
 
+}
+
+// parseCheckConstraint: CHECK ( expr )
+// See column-constraint and table-constraint
+func parseCheckConstraint(tokens *Tokens) {
+	tokens.Take()
+	value := []string{}
+	paren := 0
+	for {
+		t := tokens.Next()
+		if t == "(" {
+			tokens.Take()
+			paren += 1
+		} else if t == ")" {
+			tokens.Take()
+			paren -= 1
+			if paren < 1 {
+				break // End of CHECK EXPRESSION
+			}
+		} else {
+			// Unsupported token
+			value = append(value, tokens.Take())
+		}
+	}
+	fmt.Printf("Ignoring CHECK constraints: %s", strings.Join(value, " "))
+}
+
+func parseExpression(tokens *Tokens) {
+	// TODO
 }
