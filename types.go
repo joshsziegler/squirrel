@@ -92,6 +92,85 @@ func (t *Tokens) ReturnN(n int) {
 	t.i -= n
 }
 
+type Datatype string
+
+const (
+	UNKNOWN  Datatype = "Unknown"
+	INT               = "int"
+	BOOL              = "bool"
+	FLOAT             = "float"
+	TEXT              = "text"
+	BLOB              = "blob"
+	DATETIME          = "datetime"
+)
+
+// ToGo converts this domain type to the equivalent Go type.
+// Uses Int64 for all integers and Float64 for all floats.
+func (t Datatype) ToGo(nullable bool) string {
+	switch t {
+	case INT:
+		if nullable {
+			return "sql.NullInt64"
+		}
+		return "int64"
+	case BOOL:
+		if nullable {
+			return "sql.NullBool"
+		}
+		return "bool"
+	case FLOAT:
+		if nullable {
+			return "sql.NullFloat64"
+		}
+		return "float64"
+	case TEXT:
+		if nullable {
+			return "sql.NullString"
+		}
+		return "string"
+	case BLOB:
+		return "[]byte" // TODO: Is this the right Go type for unmarshalling from SQL?
+	case DATETIME:
+		if nullable {
+			return "sql.NullTime"
+		}
+		return "time.Time"
+	default: // Unknown datatype
+		panic("unknown datatype")
+	}
+}
+
+// FromSQL to internal domain type.
+//
+// SQLite's STRICT data types (i.e. INT, INTEGER, REAL, TEXT, BLOB, ANY).
+// SQLite Docs: https://www.sqlite.org/datatype3.html
+// mattn/go-sqlit3 Docs: https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Supported_Types
+func FromSQL(s string) (Datatype, error) {
+	switch s {
+	case "INT", "INTEGER":
+		return INT, nil
+	case "BOOL", "BOOLEAN": // SQLite does not have a bool or boolean type and represents them as integers (0 and 1) internally.
+		return BOOL, nil
+	case "FLOAT": // TODO: This isn't a valid SQLite type.
+		fallthrough
+	case "REAL":
+		return FLOAT, nil
+	case "TEXT":
+		return TEXT, nil
+	case "BLOB":
+		fallthrough
+	case "ANY":
+		return BLOB, nil
+	case "DATETIME":
+		fallthrough
+	case "TIMESTAMP":
+		return DATETIME, nil
+	default:
+		// TODO: IF strict, return an error. Otherwise use "ANY"
+		return "", fmt.Errorf("\"%s\" is not a valid SQLite column type", s)
+	}
+}
+
 type Table struct {
 	SchemaName  string
 	Name        string
@@ -130,7 +209,7 @@ func (a OnFkAction) String() string {
 
 type Column struct {
 	Name       string
-	Type       string
+	Type       Datatype
 	PrimaryKey bool
 	Nullable   bool
 	Unique     bool
@@ -143,6 +222,66 @@ type Column struct {
 	DefaultString sql.NullString
 	DefaultInt    sql.NullInt64
 	DefaultBool   sql.NullBool
+}
+
+// ORM
+// TODO: Add comment about defaults?
+func (c *Column) ORM() {
+	comment := ""
+	if c.Comment != "" {
+		comment = fmt.Sprintf(" // %s", c.Comment)
+	}
+	goType := c.Type
+	if c.Nullable {
+		switch c.Type {
+		case "int64":
+			goType = "sql.NullInt64"
+		case "float64":
+			goType = "sql.NullFloat64"
+		case "string":
+			goType = "sql.NullString"
+		case "bool":
+			goType = "sql.NullBool"
+		}
+	}
+	fmt.Printf("    %s %s%s\n", ToGoName(c.Name), goType, comment)
+}
+
+func (c *Column) Fancy() string {
+	pk := " "
+	if c.PrimaryKey {
+		pk = "P"
+	}
+	uniq := " "
+	if c.Unique {
+		uniq = "U"
+	}
+	nullable := " "
+	if c.Nullable {
+		nullable = "N"
+	}
+	def := ""
+	switch c.Type {
+	case "int64":
+		if c.DefaultInt.Valid {
+			def = fmt.Sprintf("[ %d ]", c.DefaultInt.Int64)
+		} else if c.Nullable {
+			def = "[ NULL ]"
+		}
+	case "string":
+		if c.DefaultString.Valid {
+			def = c.DefaultString.String
+		} else if c.Nullable {
+			def = "[ NULL ]"
+		}
+	case "bool":
+		if c.DefaultBool.Valid {
+			def = fmt.Sprintf("[ %v ]", c.DefaultBool.Bool)
+		} else if c.Nullable {
+			def = "[ NULL ]"
+		}
+	}
+	return fmt.Sprintf("%s%s%s %s %s", pk, uniq, nullable, c.Name, def)
 }
 
 type ColumnInt struct {

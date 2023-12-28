@@ -242,7 +242,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 		} else if token == "DEFAULT" {
 			tokens.Take()
 			switch c.Type {
-			case "int64":
+			case INT:
 				token := tokens.Take()
 				if token != "NULL" { // TODO: How to mark explicitly as DEFAULTS TO NULL?
 					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
@@ -251,12 +251,12 @@ func parseColumn(tokens *Tokens) (Column, error) {
 					}
 					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
 				}
-			case "string":
+			case TEXT:
 				if token != "NULL" {
 					token := tokens.Take()
 					c.DefaultString = sql.NullString{Valid: true, String: removeQuotes(token)}
 				}
-			case "bool":
+			case BOOL:
 				token := tokens.Take()
 				switch token {
 				case "NULL":
@@ -268,7 +268,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 				default:
 					return c, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
 				}
-			case "time.Time":
+			case DATETIME:
 				parseDatetimeDefault(tokens)
 			default:
 				return c, fmt.Errorf("default values for %s type are not supported", c.Type)
@@ -287,42 +287,12 @@ func parseColumn(tokens *Tokens) (Column, error) {
 // SQLite Docs: https://www.sqlite.org/datatype3.html
 // mattn/go-sqlit3 Docs: https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Supported_Types
 func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
-	switch tokens.Next() {
-	case "INT":
-		fallthrough
-	case "INTEGER":
-		c.Type = "int64"
-		tokens.Take()
-	case "BOOL":
-		fallthrough
-	case "BOOLEAN": // SQLite does not have a bool or boolean type and represents them as integers (0 and 1) internally.
-		c.Type = "bool"
-		tokens.Take()
-	case "FLOAT": // TODO: This isn't a valid SQLite type.
-		fallthrough
-	case "REAL":
-		c.Type = "float64"
-		tokens.Take()
-	case "TEXT":
-		c.Type = "string"
-		tokens.Take()
-	case "BLOB":
-		fallthrough
-	case "ANY":
-		c.Type = "[]byte"
-		tokens.Take()
-	case "DATETIME":
-		fallthrough
-	case "TIMESTAMP":
-		c.Type = "time.Time"
-		tokens.Take()
-	default:
-		if strict {
-			return fmt.Errorf("column '%s' must use a valid type, not %s", c.Name, tokens.Next())
-		}
-		c.Type = tokens.Next()
-		tokens.Take()
+	dt, err := FromSQL(tokens.Next())
+	if err != nil {
+		return fmt.Errorf("column '%s' must use a valid type, not %s", c.Name, tokens.Next())
 	}
+	c.Type = dt
+	tokens.Take()
 	return nil
 }
 
