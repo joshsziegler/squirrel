@@ -31,11 +31,14 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
+	fmt.Printf("package main\n\n")
 	for _, table := range tables {
-		fmt.Printf("%s %s (IfNotExists: %v, Temp: %v)\n", table.SchemaName, table.Name, table.IfNotExists, table.Temp)
-		for _, col := range table.Columns {
-			fmt.Printf("  - %+v\n", col)
-		}
-
+		table.ORM()
+		// fmt.Printf("# %s\n", table.Name)
+		// // fmt.Printf("_%s_\n\n", table.Comment)
+		// for _, col := range table.Columns {
+		// 	fmt.Printf("  - %s\n", col.Fancy())
+		// }
+		fmt.Printf("\n\n")
 	}
 }

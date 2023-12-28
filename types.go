@@ -92,6 +92,7 @@ func (t *Tokens) ReturnN(n int) {
 	t.i -= n
 }
 
+// Datatype is the domain-type representing out SQLite-to-Go type mapping.
 type Datatype string
 
 const (
@@ -180,6 +181,17 @@ type Table struct {
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
+func (t *Table) ORM() {
+	if t.Comment != "" {
+		fmt.Printf("// %s %s\n", ToGoName(t.Name), t.Comment)
+	}
+	fmt.Printf("type %s struct {\n", ToGoName(t.Name)) // TODO: Convert to Go-style CamelCase
+	for _, c := range t.Columns {
+		c.ORM()
+	}
+	fmt.Println("}")
+}
+
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
 
 const (
@@ -231,20 +243,7 @@ func (c *Column) ORM() {
 	if c.Comment != "" {
 		comment = fmt.Sprintf(" // %s", c.Comment)
 	}
-	goType := c.Type
-	if c.Nullable {
-		switch c.Type {
-		case "int64":
-			goType = "sql.NullInt64"
-		case "float64":
-			goType = "sql.NullFloat64"
-		case "string":
-			goType = "sql.NullString"
-		case "bool":
-			goType = "sql.NullBool"
-		}
-	}
-	fmt.Printf("    %s %s%s\n", ToGoName(c.Name), goType, comment)
+	fmt.Printf("    %s %s%s\n", ToGoName(c.Name), c.Type.ToGo(c.Nullable), comment)
 }
 
 func (c *Column) Fancy() string {
