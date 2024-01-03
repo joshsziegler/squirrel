@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -181,15 +182,15 @@ type Table struct {
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
-func (t *Table) ORM() {
+func (t *Table) ORM(w io.Writer) {
 	if t.Comment != "" {
-		fmt.Printf("// %s %s\n", ToGoName(t.Name), t.Comment)
+		fmt.Fprintf(w, "// %s %s\n", ToGoName(t.Name), t.Comment)
 	}
-	fmt.Printf("type %s struct {\n", ToGoName(t.Name)) // TODO: Convert to Go-style CamelCase
+	fmt.Fprintf(w, "type %s struct {\n", ToGoName(t.Name)) // TODO: Convert to Go-style CamelCase
 	for _, c := range t.Columns {
-		c.ORM()
+		c.ORM(w)
 	}
-	fmt.Println("}")
+	fmt.Fprintln(w, "}")
 }
 
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
@@ -238,54 +239,12 @@ type Column struct {
 
 // ORM
 // TODO: Add comment about defaults?
-func (c *Column) ORM() {
+func (c *Column) ORM(w io.Writer) {
 	comment := ""
 	if c.Comment != "" {
 		comment = fmt.Sprintf(" // %s", c.Comment)
 	}
-	fmt.Printf("    %s %s%s\n", ToGoName(c.Name), c.Type.ToGo(c.Nullable), comment)
-}
-
-func (c *Column) Fancy() string {
-	pk := " "
-	if c.PrimaryKey {
-		pk = "P"
-	}
-	uniq := " "
-	if c.Unique {
-		uniq = "U"
-	}
-	nullable := " "
-	if c.Nullable {
-		nullable = "N"
-	}
-	def := ""
-	switch c.Type {
-	case "int64":
-		if c.DefaultInt.Valid {
-			def = fmt.Sprintf("[ %d ]", c.DefaultInt.Int64)
-		} else if c.Nullable {
-			def = "[ NULL ]"
-		}
-	case "string":
-		if c.DefaultString.Valid {
-			def = c.DefaultString.String
-		} else if c.Nullable {
-			def = "[ NULL ]"
-		}
-	case "bool":
-		if c.DefaultBool.Valid {
-			def = fmt.Sprintf("[ %v ]", c.DefaultBool.Bool)
-		} else if c.Nullable {
-			def = "[ NULL ]"
-		}
-	}
-	return fmt.Sprintf("%s%s%s %s %s", pk, uniq, nullable, c.Name, def)
-}
-
-type ColumnInt struct {
-	Column
-	Default int64
+	fmt.Fprintf(w, "    %s %s%s\n", ToGoName(c.Name), c.Type.ToGo(c.Nullable), comment)
 }
 
 type ForeignKey struct {

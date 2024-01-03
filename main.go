@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 )
 
 // readFile from disk and return its content as a string.
@@ -31,14 +32,25 @@ func main() {
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Printf("package main\n\n")
+
+	// Write Go-SQL code to disk
+	f, err := os.OpenFile("out", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "package main\n\n")
 	for _, table := range tables {
-		table.ORM()
-		// fmt.Printf("# %s\n", table.Name)
-		// // fmt.Printf("_%s_\n\n", table.Comment)
-		// for _, col := range table.Columns {
-		// 	fmt.Printf("  - %s\n", col.Fancy())
-		// }
-		fmt.Printf("\n\n")
+		table.ORM(f)
+		fmt.Fprintf(f, "\n\n")
+	}
+
+	// Format the result
+	cmd := exec.Command("gofumpt", "-l", "-w", "out")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Error formatting output: %s\n", output)
+		fmt.Printf("Error: %s\n", err.Error())
+		return
 	}
 }

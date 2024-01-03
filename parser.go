@@ -498,7 +498,6 @@ func parseCreateIndex(tokens *Tokens) error {
 	}
 	log.Debugf("Index: %s ON %s (%v)", name, tableName, cols)
 	return nil
-
 }
 
 // parseCheckConstraint: CHECK ( expr )

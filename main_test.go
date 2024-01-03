@@ -15,7 +15,8 @@ func TestParse(t *testing.T) {
 		wantErr bool
 		want    []*Table
 	}{
-		{"basic table",
+		{
+			"basic table",
 			`CREATE TABLE users ( name TEXT PRIMARY KEY )`, false,
 			[]*Table{
 				{
@@ -26,7 +27,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"basic table without nullable primary key",
+		{
+			"basic table without nullable primary key",
 			`CREATE TABLE users ( name TEXT PRIMARY KEY NOT NULL)`, false,
 			[]*Table{
 				{
@@ -37,7 +39,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"numeric ID primary key, but nullable unique name",
+		{
+			"numeric ID primary key, but nullable unique name",
 			`CREATE TABLE users (
 				id INT PRIMARY KEY NOT NULL AUTOINCREMENT,
 				name TEXT UNIQUE
@@ -53,7 +56,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"integer number of nodes and semicolon at end of definition",
+		{
+			"integer number of nodes and semicolon at end of definition",
 			`CREATE TABLE jobs (
 				id INT PRIMARY KEY NOT NULL AUTOINCREMENT,
 				num_nodes INTEGER
@@ -69,7 +73,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"quotes table name and comments at end of the CREATE TABLE line",
+		{
+			"quotes table name and comments at end of the CREATE TABLE line",
 			`CREATE TABLE "foo" ( -- Hello world!
 				id INT PRIMARY KEY NOT NULL AUTOINCREMENT
 			);`,
@@ -84,7 +89,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"bugs due to spacing between comment delimiter and comment text",
+		{
+			"bugs due to spacing between comment delimiter and comment text",
 			`CREATE TABLE comments (
 				foo TEXT, --no space between delimiter and first word
 				bar TEXT,-- no space after comma ending the column definition
@@ -102,7 +108,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"comments at end of a column line",
+		{
+			"comments at end of a column line",
 			`CREATE TABLE bars (
 				name TEXT NOT NULL UNIQUE, -- name of the bar
 				open INTEGER,
@@ -121,7 +128,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"every data type supported by STRICT",
+		{
+			"every data type supported by STRICT",
 			`CREATE TABLE animals (
 				name TEXT PRIMARY KEY NOT NULL,
 				age INT NOT NULL,
@@ -147,7 +155,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"invalid column type 'INTERGER'",
+		{
+			"invalid column type 'INTERGER'",
 			`CREATE TABLE jobs (
 				id TEXT UNIQUE NOT NULL,
 				user_id INTERGER NOT NULL
@@ -155,7 +164,8 @@ func TestParse(t *testing.T) {
 			true,
 			[]*Table{},
 		},
-		{"a Foreign Key specified with inline REFERENCES",
+		{
+			"a Foreign Key specified with inline REFERENCES",
 			`CREATE TABLE people (
 				id		INT NOT NULL PRIMARY KEY,
 				name	TEXT NOT NULL, -- Name may not be unique!
@@ -173,7 +183,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"default value as a constant string",
+		{
+			"default value as a constant string",
 			`CREATE TABLE product (
 				id				INT		NOT NULL	PRIMARY KEY,
 				name			TEXT	NOT NULL	UNIQUE,
@@ -203,7 +214,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"a Foreign Key specified with inline REFERENCES and ON DELETE, ON UPDATE, and both ...",
+		{
+			"a Foreign Key specified with inline REFERENCES and ON DELETE, ON UPDATE, and both ...",
 			`CREATE TABLE boxes (
 				id		INTEGER NOT NULL PRIMARY KEY,
 				name	TEXT NOT NULL UNIQUE
@@ -243,7 +255,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"a Foreign Key specified with without specifying a column name",
+		{
+			"a Foreign Key specified with without specifying a column name",
 			`CREATE TABLE users (
 				user_id	INTEGER NOT NULL PRIMARY KEY,
 				name	TEXT NOT NULL
@@ -280,7 +293,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"named-constraint-with-multi-column-primary-key",
+		{
+			"named-constraint-with-multi-column-primary-key",
 			`CREATE TABLE IF NOT EXISTS "albums" (
 			 artist        TEXT NOT NULL,
 			 album_title   TEXT NOT NULL,
@@ -301,7 +315,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"unnamed-unique-constraint",
+		{
+			"unnamed-unique-constraint",
 			`CREATE TABLE IF NOT EXISTS "players" (
 			 server        INT NOT NULL,
 			 character_name   TEXT NOT NULL,
@@ -320,7 +335,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"foreign-key-on-own-line-to-single-column",
+		{
+			"foreign-key-on-own-line-to-single-column",
 			`CREATE TABLE "albums" (
 			 artist TEXT NOT NULL,
 			 name   TEXT NOT NULL,
@@ -340,7 +356,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"foreign key on own line",
+		{
+			"foreign key on own line",
 			` CREATE TABLE job_extended_attrs (
 				fk_job_id TEXT NOT NULL,
 				auto_extend INTEGER NOT NULL,
@@ -359,7 +376,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"indices-on-simple-table",
+		{
+			"indices-on-simple-table",
 			`CREATE TABLE users (
 				name TEXT NOT NULL PRIMARY KEY,
 				email TEXT NOT NULL,
@@ -380,7 +398,8 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		{"datetime with default value of now",
+		{
+			"datetime with default value of now",
 			`CREATE TABLE "login_attempts" (
 				id   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
 				ip   TEXT NOT NULL,
