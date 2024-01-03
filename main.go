@@ -39,10 +39,11 @@ func main() {
 		panic(err)
 	}
 	defer f.Close()
+	w := ShortWriter{w: f}
 	fmt.Fprintf(f, "package main\n\n")
 	for _, table := range tables {
-		table.ORM(f)
-		fmt.Fprintf(f, "\n\n")
+		table.ORM(w)
+		w.F("\n\n")
 	}
 
 	// Format the result
