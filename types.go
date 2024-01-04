@@ -181,6 +181,16 @@ type Table struct {
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
+// PrimaryKey if one is defined (assumes it is one column, and not multi-column).
+func (t *Table) PrimaryKey() *Column {
+	for _, col := range t.Columns {
+		if col.PrimaryKey {
+			return &col
+		}
+	}
+	return nil
+}
+
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
 
 const (

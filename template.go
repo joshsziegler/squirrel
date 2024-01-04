@@ -97,19 +97,25 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("    return x._exists")
 	w.N("}")
 
-	w.N("// Deleted when this row has been marked for deletion from the database.")
-	w.F("func (x *%s) Deleted() bool {", goName)
+	w.N("// Deleted from the database.")
+	w.F("func (x *%s) Deleted() bool {\n", goName)
 	w.N("	return x._deleted")
 	w.N("}")
 
 	// Handle Insert, Update, Upsert, Delete
+	pk := t.PrimaryKey()
 	w.F("func (x *%s) Insert(ctx context.Context, dbc DB) error {\n", goName)
-	w.N(`    if x._exists {`)
+	w.N(`    switch {`)
+	w.N(`    case x._exists:`)
 	w.N(`        return merry.Wrap(ErrInsertAlreadyExists)`)
-	w.N(`    } else if x.deleted {`)
+	w.N(`    case x._deleted:`)
 	w.N(`        return merry.Wrap(ErrInsertMarkedForDeletion)`)
 	w.N(`    }`)
-	w.N("    res, err := dbc.NamedExecContext(ctx, `")
+	if pk != nil && pk.Name == "ID" { // TODO: Handle auto-generated 'rowid'
+		w.N("    res, err := dbc.NamedExecContext(ctx, `")
+	} else {
+		w.N("    _, err := dbc.NamedExecContext(ctx, `")
+	}
 	w.F("        INSERT INTO %s (", t.Name)
 	for i, col := range t.Columns {
 		if i > 0 {
@@ -131,11 +137,13 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("if err != nil {")
 	w.N("	return err")
 	w.N("}")
-	w.N("id, err := res.LastInsertId()")
-	w.N("if err != nil {")
-	w.N("	return err")
-	w.N("}")
-	w.N("x.ID = id")
+	if pk != nil && pk.Name == "ID" { // TODO: Handle auto-generated 'rowid'
+		w.N("id, err := res.LastInsertId()")
+		w.N("if err != nil {")
+		w.N("	return err")
+		w.N("}")
+		w.N("x.ID = id")
+	}
 	w.N("x._exists = true")
 	w.N("return nil")
 	w.N(`}`)
