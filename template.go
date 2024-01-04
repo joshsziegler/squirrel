@@ -23,11 +23,20 @@ func (x *ShortWriter) F(format string, a ...any) {
 }
 
 func Header(w ShortWriter, pkgName string) {
-	w.F(`package %s`, pkgName)
+	w.F("package %s\n\n", pkgName)
+	w.N(`
+import (
+	"context"
+	"database/sql"
+	"time"
+
+	"github.com/ansel1/merry/v2"
+)
+`)
 	w.N(`
 // DB is the common interface for database operations and works with sqlx.DB, and sqlx.Tx.
 // Use this IFF the function or method only performs one SQL operation to provide flexibility to the caller.
-// If the function or method performs two or more SQL operations, use TXI instead.
+// If the function or method performs two or more SQL operations, use TX instead.
 // This forces the caller to use a transaction and indicates that it's necessary to maintain data consistency.
 type DB interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
@@ -56,6 +65,17 @@ type TX interface {
 	Commit() error
 	Rollback() error
 }
+
+var (
+	ErrAlreadyExists           = merry.New("already exists", merry.NoCaptureStack())
+	ErrDoesNotExist            = merry.New("does not exist", merry.NoCaptureStack())
+	ErrMarkedForDeletion       = merry.New("marked for deletion", merry.NoCaptureStack())
+	ErrInsertAlreadyExists     = merry.Prepend(ErrAlreadyExists, "cannot insert", merry.NoCaptureStack())
+	ErrInsertMarkedForDeletion = merry.Prepend(ErrMarkedForDeletion, "cannot insert", merry.NoCaptureStack())
+	ErrUpdateDoesNotExist      = merry.Prepend(ErrDoesNotExist, "cannot update", merry.NoCaptureStack())
+	ErrUpdateMarkedForDeletion = merry.Prepend(ErrMarkedForDeletion, "cannot update", merry.NoCaptureStack())
+	ErrUpsertMarkedForDeletion = merry.Prepend(ErrMarkedForDeletion, "cannot upsert", merry.NoCaptureStack())
+)
 `)
 }
 
@@ -172,7 +192,7 @@ func TableToGo(w ShortWriter, t *Table) {
 	// TODO: Add UPSERT
 
 	w.N("// Delete this row from the database.")
-	w.N("func (x *LoginAttempt) Delete(ctx context.Context, dbc DB) error {")
+	w.F("func (x *%s) Delete(ctx context.Context, dbc DB) error {\n", goName)
 	w.N("switch {")
 	w.N("case !x._exists: // doesn't exist")
 	w.N("	return nil")
@@ -194,11 +214,14 @@ func TableToGo(w ShortWriter, t *Table) {
 // Adds a comment about whether this column is Unique, has a Default, and the SQL comment
 func ColumnToGo(w ShortWriter, c *Column) {
 	commentParts := []string{}
-	if c.ForeignKey != nil {
-		commentParts = append(commentParts, fmt.Sprintf("FK: %s.%s", c.ForeignKey.Table, c.ForeignKey.Column))
+	if c.PrimaryKey {
+		commentParts = append(commentParts, "PK")
 	}
 	if c.Unique {
 		commentParts = append(commentParts, "Unique")
+	}
+	if c.ForeignKey != nil {
+		commentParts = append(commentParts, fmt.Sprintf("FK: %s.%s", c.ForeignKey.Table, c.ForeignKey.Column))
 	}
 	switch {
 	case c.DefaultBool.Valid:
@@ -208,9 +231,9 @@ func ColumnToGo(w ShortWriter, c *Column) {
 	case c.DefaultInt.Valid:
 		commentParts = append(commentParts, fmt.Sprintf("Default: %v", c.DefaultInt.Int64))
 	}
-	//if c.Comment != "" {
-	//	commentParts = append(commentParts, "--", c.Comment)
-	//}
+	if c.Comment != "" {
+		commentParts = append(commentParts, fmt.Sprintf("-- %s", c.Comment))
+	}
 	comment := ""
 	if len(commentParts) > 0 {
 		comment = fmt.Sprintf("// %s", strings.Join(commentParts, ", "))

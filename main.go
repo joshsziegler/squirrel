@@ -34,7 +34,7 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string) error {
 	}
 
 	// Write Go-SQL code to disk
-	f, err := os.OpenFile(goPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(goPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string) error {
 	}
 
 	// Format the result
-	cmd := exec.Command("gofumpt", "-l", "-w", "out")
+	cmd := exec.Command("gofmt", "-l", "-w", "out")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("Error formatting output: %s; %s", err.Error(), output)
