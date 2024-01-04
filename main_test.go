@@ -178,7 +178,7 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
 						{Name: "name", Type: TEXT, Nullable: false, Comment: "Name may not be unique!"},
-						{Name: "spouse", Type: INT, Nullable: true, ForeignKey: &ForeignKey{Table: "people", ColumnName: "id"}, Comment: "Husband or Wife within this table"},
+						{Name: "spouse", Type: INT, Nullable: true, ForeignKey: &ForeignKey{Table: "people", Column: "id"}, Comment: "Husband or Wife within this table"},
 					},
 				},
 			},
@@ -249,8 +249,8 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
 						{Name: "name", Type: TEXT, Nullable: false, Unique: false},
-						{Name: "box_id", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "boxes", ColumnName: "id", OnDelete: Cascade}},
-						{Name: "franchise_name", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "franchises", ColumnName: "name", OnUpdate: Cascade, OnDelete: SetNull}},
+						{Name: "box_id", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "boxes", Column: "id", OnDelete: Cascade}},
+						{Name: "franchise_name", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "franchises", Column: "name", OnUpdate: Cascade, OnDelete: SetNull}},
 					},
 				},
 			},
@@ -287,8 +287,8 @@ func TestParse(t *testing.T) {
 				{
 					Name: "user_group",
 					Columns: []Column{
-						{Name: "user_id", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "users", ColumnName: "user_id"}, Comment: "Column name is implied by omitting it"},
-						{Name: "group_name", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "groups", ColumnName: "group_name"}},
+						{Name: "user_id", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "users", Column: "user_id"}, Comment: "Column name is implied by omitting it"},
+						{Name: "group_name", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "groups", Column: "group_name"}},
 					},
 				},
 			},

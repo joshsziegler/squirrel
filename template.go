@@ -22,6 +22,43 @@ func (x *ShortWriter) F(format string, a ...any) {
 	fmt.Fprintf(x.w, format, a...)
 }
 
+func Header(w ShortWriter, pkgName string) {
+	w.F(`package %s`, pkgName)
+	w.N(`
+// DB is the common interface for database operations and works with sqlx.DB, and sqlx.Tx.
+// Use this IFF the function or method only performs one SQL operation to provide flexibility to the caller.
+// If the function or method performs two or more SQL operations, use TXI instead.
+// This forces the caller to use a transaction and indicates that it's necessary to maintain data consistency.
+type DB interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	Get(dest interface{}, query string, args ...interface{}) error
+	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+	NamedExec(query string, arg interface{}) (sql.Result, error)
+	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
+	Query(query string, args ...any) (*sql.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...any) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+	Rebind(query string) string
+	Select(dest interface{}, query string, args ...interface{}) error
+	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
+}
+
+// TX is the common interface for database operations requiring a transaction and works with sqlx.Tx.
+// Use this IFF the function or method performs two or more SQL operations.
+// This forces the caller to use a transaction and indicates that it's necessary to maintain data consistency.
+// If the function or method performs only one SQL operation, use DB instead.
+type TX interface {
+	DB
+	Commit() error
+	Rollback() error
+}
+`)
+}
+
 // TableToGo converts a Table to its Go-ORM layer.
 func TableToGo(w ShortWriter, t *Table) {
 	goName := ToGoName(t.Name)
@@ -158,7 +195,7 @@ func TableToGo(w ShortWriter, t *Table) {
 func ColumnToGo(w ShortWriter, c *Column) {
 	commentParts := []string{}
 	if c.ForeignKey != nil {
-		commentParts = append(commentParts, fmt.Sprintf("FK: %s.%s", c.ForeignKey.Table, c.ForeignKey.ColumnName))
+		commentParts = append(commentParts, fmt.Sprintf("FK: %s.%s", c.ForeignKey.Table, c.ForeignKey.Column))
 	}
 	if c.Unique {
 		commentParts = append(commentParts, "Unique")

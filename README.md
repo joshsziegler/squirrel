@@ -1,5 +1,16 @@
 # Squirrel
 
+Squirrel is a bare-bones SQLite schema parser and Go access layer generator.
+It allows you to parse the output of `sqlite3 my.db .dump` to produce a Go code.
+Warning: This is very rough and not recommended for production use!
+
+# Install
+
+```bash
+go install github.com/joshsziegler/squirrel@latest # Install this binary
+go install go install mvdan.cc/gofumpt@latest      # Install gofumpt for formatting output
+```
+
 ## To Do
 
 - [ ] Multi-column Primary Keys (on their own line)

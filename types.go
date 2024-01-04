@@ -226,8 +226,8 @@ type Column struct {
 }
 
 type ForeignKey struct {
-	Table      string
-	ColumnName string
-	OnUpdate   OnFkAction // OnUpdate action to take (e.g. none, Set Null, Set Default, etc.)
-	OnDelete   OnFkAction // OnDelete action to take (e.g. none, Set Null, Set Default, etc.)
+	Table    string
+	Column   string
+	OnUpdate OnFkAction // OnUpdate action to take (e.g. none, Set Null, Set Default, etc.)
+	OnDelete OnFkAction // OnDelete action to take (e.g. none, Set Null, Set Default, etc.)
 }

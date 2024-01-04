@@ -305,10 +305,10 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 	// TODO: Handle [conflict-clause]
 	c.ForeignKey = &ForeignKey{Table: tokens.Take()}
 	if tokens.Next() == "(" && tokens.Peek(2) == ")" { // If the column is specified
-		c.ForeignKey.ColumnName = tokens.Peek(1)
+		c.ForeignKey.Column = tokens.Peek(1)
 		tokens.TakeN(3)
 	} else {
-		c.ForeignKey.ColumnName = c.Name // Not specified, so it should be the same name as THIS column name.
+		c.ForeignKey.Column = c.Name // Not specified, so it should be the same name as THIS column name.
 	}
 	// ON UPDATE/ON DELETE (can have multiple)
 	for {
@@ -334,7 +334,7 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 	if len(cols) > 1 {
 		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
 	}
-	fk.ColumnName = cols[0] // FROM-COLUMN
+	fk.Column = cols[0] // FROM-COLUMN
 	removeNewlines(tokens)
 	if tokens.Take() != "REFERENCES" {
 		tokens.Return()
