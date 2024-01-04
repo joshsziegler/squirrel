@@ -42,7 +42,7 @@ func main() {
 	w := ShortWriter{w: f}
 	fmt.Fprintf(f, "package main\n\n")
 	for _, table := range tables {
-		table.ORM(w)
+		TableToGo(w, table)
 		w.F("\n\n")
 	}
 

@@ -3,23 +3,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"strings"
 )
-
-type ShortWriter struct {
-	w io.Writer
-}
-
-// N ~ Newline
-func (x *ShortWriter) N(s string) {
-	fmt.Fprintln(x.w, s)
-}
-
-// F ~ Format
-func (x *ShortWriter) F(format string, a ...any) {
-	fmt.Fprintf(x.w, format, a...)
-}
 
 func NewTokens(tokens []string) *Tokens {
 	return &Tokens{
@@ -196,136 +181,6 @@ type Table struct {
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
-func (t *Table) ORM(w ShortWriter) {
-	goName := ToGoName(t.Name)
-	if t.Comment != "" {
-		w.F("// %s %s\n", goName, t.Comment)
-	}
-	w.F("type %s struct {\n", goName)
-	for _, c := range t.Columns {
-		c.ORM(w)
-	}
-	w.N(`    _exists, _deleted bool // DB Metadata `)
-	w.N("}")
-
-	w.N("// Exists in the database.")
-	w.F("func (x *%s) Exists() bool {\n", goName)
-	w.N("    return x._exists")
-	w.N("}")
-
-	w.N("// Deleted when this row has been marked for deletion from the database.")
-	w.F("func (x *%s) Deleted() bool {", goName)
-	w.N("	return x._deleted")
-	w.N("}")
-
-	// Handle Insert, Update, Upsert, Delete
-	w.F("func (x *%s) Insert(ctx context.Context, dbc DB) error {\n", goName)
-	w.N(`    if x._exists {`)
-	w.N(`        return merry.Wrap(ErrInsertAlreadyExists)`)
-	w.N(`    } else if x.deleted {`)
-	w.N(`        return merry.Wrap(ErrInsertMarkedForDeletion)`)
-	w.N(`    }`)
-	w.N("    res, err := dbc.NamedExecContext(ctx, `")
-	w.F("        INSERT INTO %s (", t.Name)
-	for i, col := range t.Columns {
-		if i > 0 {
-			w.F(", %s", col.Name)
-		} else {
-			w.F("%s", col.Name)
-		}
-	}
-	w.N(")")
-	w.F("        VALUES (")
-	for i, col := range t.Columns {
-		if i > 0 {
-			w.F(", :%s", col.Name)
-		} else {
-			w.F(":%s", col.Name)
-		}
-	}
-	w.N(")`, x)")
-	w.N("if err != nil {")
-	w.N("	return err")
-	w.N("}")
-	w.N("id, err := res.LastInsertId()")
-	w.N("if err != nil {")
-	w.N("	return err")
-	w.N("}")
-	w.N("x.ID = id")
-	w.N("x._exists = true")
-	w.N("return nil")
-	w.N(`}`)
-
-	w.N("// Update this row in the database.")
-	w.F("func (x *%s) Update(ctx context.Context, dbc DB) error {\n", goName)
-	w.N("switch {")
-	w.N("case !x._exists: // doesn't exist")
-	w.N("	return merry.Wrap(ErrUpdateDoesNotExist)")
-	w.N("case x._deleted: // deleted")
-	w.N("	return ErrUpdateMarkedForDeletion")
-	w.N("}")
-	w.N("// update with primary key")
-	w.N("_, err := dbc.NamedExecContext(ctx, `")
-	w.F("        UPDATE %s (", t.Name)
-	for i, col := range t.Columns { // TODO: Exclude DB-generated fields
-		if col.PrimaryKey {
-			continue // skip
-		}
-		if i > 0 {
-			w.F(", %s", col.Name)
-		} else {
-			w.F("%s", col.Name)
-		}
-	}
-	w.N(")")
-	w.F("        VALUES (")
-	for i, col := range t.Columns { // TODO: Exclude DB-generated fields
-		if col.PrimaryKey {
-			continue // skip
-		}
-		if i > 0 {
-			w.F(", :%s", col.Name)
-		} else {
-			w.F(":%s", col.Name)
-		}
-	}
-	w.N(")")
-	w.N("        WHERE id = :id`, x)") // TODO: How to determine PK, or composite PK?
-	w.N("if err != nil {")
-	w.N("	return err")
-	w.N("}")
-	w.N("return nil")
-	w.N("}")
-
-	w.N("// Save this row to the database, either using Insert or Update.")
-	w.F("func (x *%s) Save(ctx context.Context, dbc DB) error {", goName)
-	w.N("    if x.Exists() {")
-	w.N("        return x.Update(ctx, dbc)")
-	w.N("    }")
-	w.N("    return x.Insert(ctx, dbc)")
-	w.N("}")
-
-	// TODO: Add UPSERT
-
-	w.N("// Delete this row from the database.")
-	w.N("func (x *LoginAttempt) Delete(ctx context.Context, dbc DB) error {")
-	w.N("switch {")
-	w.N("case !x._exists: // doesn't exist")
-	w.N("	return nil")
-	w.N("case x._deleted:")
-	w.N("	return nil")
-	w.N("}")
-	w.N("_, err := dbc.NamedExecContext(ctx, `")
-	w.F("        DELETE FROM %s\n", t.Name)
-	w.F("        WHERE id = :id`, x)\n") // TODO: How to determine PK, or composite PK?
-	w.N("if err != nil {")
-	w.N("	return err")
-	w.N("}")
-	w.N("x._deleted = true")
-	w.N("return nil")
-	w.N("}")
-}
-
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
 
 const (
@@ -368,16 +223,6 @@ type Column struct {
 	DefaultString sql.NullString
 	DefaultInt    sql.NullInt64
 	DefaultBool   sql.NullBool
-}
-
-// ORM
-// TODO: Add comment about defaults?
-func (c *Column) ORM(w ShortWriter) {
-	comment := ""
-	if c.Comment != "" {
-		comment = fmt.Sprintf(" // %s", c.Comment)
-	}
-	w.F("    %s %s%s\n", ToGoName(c.Name), c.Type.ToGo(c.Nullable), comment)
 }
 
 type ForeignKey struct {
