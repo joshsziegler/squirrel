@@ -191,6 +191,32 @@ func (t *Table) PrimaryKey() *Column {
 	return nil
 }
 
+// InsertColumns returns all columns that are not DB-generated (row ID, created_at, updated_at)
+// that should be included on INSERTs.
+func (t *Table) InsertColumns() []string {
+	cols := []string{}
+	for _, col := range t.Columns {
+		if col.DBGenerated() {
+			continue
+		}
+		cols = append(cols, col.Name)
+	}
+	return cols
+}
+
+// UpdateColumns returns all columns that are not DB-generated (row ID, created_at)
+// that should be included on UPDATEs.
+func (t *Table) UpdateColumns() []string {
+	cols := []string{}
+	for _, col := range t.Columns {
+		if col.DBGenerated() {
+			continue
+		}
+		cols = append(cols, col.Name)
+	}
+	return cols
+}
+
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
 
 const (
@@ -233,6 +259,21 @@ type Column struct {
 	DefaultString sql.NullString
 	DefaultInt    sql.NullInt64
 	DefaultBool   sql.NullBool
+}
+
+// DBGenerated returns true if the database creates this column, such as row IDs, or
+// created/updates_at metadata.
+func (c *Column) DBGenerated() bool {
+	switch {
+	case c.PrimaryKey:
+		return true
+	case c.Name == "created_at":
+		return true
+	case c.Name == "updated_at":
+		return true
+	default:
+		return false
+	}
 }
 
 type ForeignKey struct {

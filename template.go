@@ -82,14 +82,38 @@ var (
 // TableToGo converts a Table to its Go-ORM layer.
 func TableToGo(w ShortWriter, t *Table) {
 	goName := ToGoName(t.Name)
+
+	insertCols := t.InsertColumns()
+	insertColListA := strings.Join(insertCols, ", ")
+	insertColListB := ""
+	for i, col := range insertCols {
+		if i > 0 {
+			insertColListB += ", :" + col
+		} else {
+			insertColListB += ":" + col
+		}
+	}
+
+	updateCols := t.UpdateColumns()
+	updateColListA := strings.Join(updateCols, ", ")
+	updateColListB := ""
+	for i, col := range updateCols {
+		if i > 0 {
+			updateColListB += ", :" + col
+		} else {
+			updateColListB += ":" + col
+		}
+	}
+
+	w.F("// %s represents a row from '%s'\n", goName, t.Name)
 	if t.Comment != "" {
-		w.F("// %s %s\n", goName, t.Comment)
+		w.F("// Schema Comment: %s\n", t.Comment)
 	}
 	w.F("type %s struct {\n", goName)
 	for _, c := range t.Columns {
 		ColumnToGo(w, &c)
 	}
-	w.N(`    _exists, _deleted bool // DB Metadata `)
+	w.N(`    _exists, _deleted bool // In-memory-only metadata on this row's status in the DB`)
 	w.N("}")
 
 	w.N("// Exists in the database.")
@@ -102,8 +126,10 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("	return x._deleted")
 	w.N("}")
 
-	// Handle Insert, Update, Upsert, Delete
+	// INSERT
 	pk := t.PrimaryKey()
+	w.N("// Insert this row into the database, returning an error on conflicts.")
+	w.N("// Use Upsert if a conflict should not result in an error.")
 	w.F("func (x *%s) Insert(ctx context.Context, dbc DB) error {\n", goName)
 	w.N(`    switch {`)
 	w.N(`    case x._exists:`)
@@ -116,23 +142,8 @@ func TableToGo(w ShortWriter, t *Table) {
 	} else {
 		w.N("    _, err := dbc.NamedExecContext(ctx, `")
 	}
-	w.F("        INSERT INTO %s (", t.Name)
-	for i, col := range t.Columns {
-		if i > 0 {
-			w.F(", %s", col.Name)
-		} else {
-			w.F("%s", col.Name)
-		}
-	}
-	w.N(")")
-	w.F("        VALUES (")
-	for i, col := range t.Columns {
-		if i > 0 {
-			w.F(", :%s", col.Name)
-		} else {
-			w.F(":%s", col.Name)
-		}
-	}
+	w.F("        INSERT INTO %s (%s)\n", t.Name, insertColListA)
+	w.F("        VALUES (%s)\n", insertColListB)
 	w.N(")`, x)")
 	w.N("if err != nil {")
 	w.N("	return err")
@@ -148,57 +159,58 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("return nil")
 	w.N(`}`)
 
-	w.N("// Update this row in the database.")
-	w.F("func (x *%s) Update(ctx context.Context, dbc DB) error {\n", goName)
-	w.N("switch {")
-	w.N("case !x._exists: // doesn't exist")
-	w.N("	return merry.Wrap(ErrUpdateDoesNotExist)")
-	w.N("case x._deleted: // deleted")
-	w.N("	return ErrUpdateMarkedForDeletion")
-	w.N("}")
-	w.N("// update with primary key")
-	w.N("_, err := dbc.NamedExecContext(ctx, `")
-	w.F("        UPDATE %s (", t.Name)
-	for i, col := range t.Columns { // TODO: Exclude DB-generated fields
-		if col.PrimaryKey {
-			continue // skip
-		}
-		if i > 0 {
-			w.F(", %s", col.Name)
-		} else {
-			w.F("%s", col.Name)
-		}
+	if pk == nil {
+		w.N("// Update and Save methods not provided because we were unable to determine a PK\n\n")
+	} else {
+		w.N("// Update this row in the database.")
+		w.F("func (x *%s) Update(ctx context.Context, dbc DB) error {\n", goName)
+		w.N("switch {")
+		w.N("case !x._exists: // doesn't exist")
+		w.N("	return merry.Wrap(ErrUpdateDoesNotExist)")
+		w.N("case x._deleted: // deleted")
+		w.N("	return ErrUpdateMarkedForDeletion")
+		w.N("}")
+		w.N("// update with primary key")
+		w.N("_, err := dbc.NamedExecContext(ctx, `")
+		w.F("        UPDATE %s (%s)\n", t.Name, updateColListA)
+		w.F("        VALUES (%s)\n", updateColListB)
+		w.F("        WHERE %s=:%s`, x)\n", pk.Name, pk.Name) // TODO: How to determine PK, or composite PK?
+		w.N("if err != nil {")
+		w.N("	return err")
+		w.N("}")
+		w.N("return nil")
+		w.N("}")
+
+		w.N("// Save this row to the database, either using Insert or Update.")
+		w.F("func (x *%s) Save(ctx context.Context, dbc DB) error {", goName)
+		w.N("    if x.Exists() {")
+		w.N("        return x.Update(ctx, dbc)")
+		w.N("    }")
+		w.N("    return x.Insert(ctx, dbc)")
+		w.N("}")
 	}
-	w.N(")")
-	w.F("        VALUES (")
-	for i, col := range t.Columns { // TODO: Exclude DB-generated fields
-		if col.PrimaryKey {
-			continue // skip
-		}
-		if i > 0 {
-			w.F(", :%s", col.Name)
-		} else {
-			w.F(":%s", col.Name)
-		}
-	}
-	w.N(")")
-	w.N("        WHERE id = :id`, x)") // TODO: How to determine PK, or composite PK?
-	w.N("if err != nil {")
-	w.N("	return err")
-	w.N("}")
-	w.N("return nil")
-	w.N("}")
 
-	w.N("// Save this row to the database, either using Insert or Update.")
-	w.F("func (x *%s) Save(ctx context.Context, dbc DB) error {", goName)
-	w.N("    if x.Exists() {")
-	w.N("        return x.Update(ctx, dbc)")
-	w.N("    }")
-	w.N("    return x.Insert(ctx, dbc)")
+	// UPSERT
+	w.N("// Upsert this row to the database.")
+	w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", goName)
+	w.N("	switch {")
+	w.N("	case x._deleted: // deleted")
+	w.N("		return merry.Wrap(ErrUpsertMarkedForDeletion)")
+	w.N("	}")
+	w.N("	_, err := dbc.NamedExecContext(ctx, `")
+	w.F("		INSERT INTO %s (ip, time)\n", t.Name) // FIXME: Not done...
+	w.N("		VALUES (:ip, :time)")
+	w.N("		ON CONFLICT (ip, time)")
+	w.N("		DO UPDATE SET ip = EXCLUDED.ip, time=EXCLUDED.time`, x)")
+	w.N("	if err != nil {")
+	w.N("		return err")
+	w.N("	}")
+	w.N("	// set exists")
+	w.N("	x._exists = true")
+	w.N("	return nil")
 	w.N("}")
 
-	// TODO: Add UPSERT
-
+	// DELETE
 	w.N("// Delete this row from the database.")
 	w.F("func (x *%s) Delete(ctx context.Context, dbc DB) error {\n", goName)
 	w.N("switch {")
