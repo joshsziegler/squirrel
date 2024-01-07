@@ -180,6 +180,7 @@ type Table struct {
 	IfNotExists bool
 	Columns     []Column
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
+	primaryKeys []string
 }
 
 func (t *Table) GoName() string  { return t.goName }
@@ -189,40 +190,28 @@ func (t *Table) SetSQLName(name string) {
 	t.goName = ToGoName(name)
 }
 
-// PrimaryKey if one is defined (assumes it is one column, and not multi-column).
-func (t *Table) PrimaryKey() *Column {
-	for _, col := range t.Columns {
-		if col.PrimaryKey {
-			return &col
-		}
+func (t *Table) SetPrimaryKeys(colNames []string) error {
+	if len(t.primaryKeys) > 0 {
+		return fmt.Errorf("table cannot have more than one primary key definition")
 	}
+	if len(colNames) < 1 {
+		return fmt.Errorf("must provide at least one column name for primary key(s)")
+	}
+	t.primaryKeys = colNames
 	return nil
 }
 
-// InsertColumns returns all columns that are not DB-generated (row ID, created_at, updated_at)
-// that should be included on INSERTs.
-func (t *Table) InsertColumns() []string {
-	cols := []string{}
-	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue
-		}
-		cols = append(cols, col.sqlName)
+// PrimaryKeys returns the column name(s).
+func (t *Table) PrimaryKeys() []string {
+	if len(t.primaryKeys) > 0 {
+		return t.primaryKeys
 	}
-	return cols
-}
-
-// UpdateColumns returns all columns that are not DB-generated (row ID, created_at)
-// that should be included on UPDATEs.
-func (t *Table) UpdateColumns() []string {
-	cols := []string{}
 	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue
+		if col.PrimaryKey {
+			return []string{col.sqlName}
 		}
-		cols = append(cols, col.sqlName)
 	}
-	return cols
+	return []string{} // None found
 }
 
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
@@ -297,4 +286,10 @@ type ForeignKey struct {
 	Column   string
 	OnUpdate OnFkAction // OnUpdate action to take (e.g. none, Set Null, Set Default, etc.)
 	OnDelete OnFkAction // OnDelete action to take (e.g. none, Set Null, Set Default, etc.)
+}
+
+// Template holds all data needed to execute out template.
+type Template struct {
+	PackageName string
+	Tables      []*Table
 }

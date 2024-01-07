@@ -158,15 +158,15 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 		case "--": // Comment
 			parseComment(tokens)
 		case "CONSTRAINT": // Named table constraint
-			parseTableConstraint(tokens)
+			parseTableConstraint(tokens, t)
 		case "PRIMARY": // table-constraint
-			parseTableConstraint(tokens)
+			parseTableConstraint(tokens, t)
 		case "UNIQUE": // table-constraint
-			parseTableConstraint(tokens)
+			parseTableConstraint(tokens, t)
 		case "CHECK": // table-constraint
-			parseTableConstraint(tokens)
+			parseTableConstraint(tokens, t)
 		case "FOREIGN": // table-constraint
-			parseTableConstraint(tokens)
+			parseTableConstraint(tokens, t)
 		default: // column-def
 			col, err := parseColumn(tokens)
 			if err != nil {
@@ -403,7 +403,7 @@ func parseDatetimeDefault(tokens *Tokens) {
 
 // table-constraint
 // https://www.sqlite.org/syntax/table-constraint.html
-func parseTableConstraint(tokens *Tokens) error {
+func parseTableConstraint(tokens *Tokens, table *Table) error {
 	name := ""
 	switch {
 	case tokens.Next() == "CONSTRAINT": // Named table constraint (which is optional)
@@ -411,9 +411,8 @@ func parseTableConstraint(tokens *Tokens) error {
 		log.Debugf("[IGNORED] Table Constraint Constraint: %s", tokens.Take())
 	case tokens.NextN(2) == "PRIMARY KEY": // table-constraint
 		tokens.TakeN(2) // PRIMARY KEY
-		cols := parseIndexedColumn(tokens)
+		table.SetPrimaryKeys(parseIndexedColumn(tokens))
 		// TODO: Handle conflict clause
-		log.Debugf("[IGNORED] Table Constraint Primary Key '%s' Columns: %v", name, cols)
 	case tokens.Next() == "UNIQUE": // table-constraint
 		tokens.Take()
 		cols := parseIndexedColumn(tokens)

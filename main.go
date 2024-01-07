@@ -39,8 +39,8 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string) error {
 		return err
 	}
 	defer f.Close()
-	w := ShortWriter{w: f}
 
+	w := ShortWriter{w: f}
 	Header(w, pkgName)
 	for _, table := range tables {
 		TableToGo(w, table)
