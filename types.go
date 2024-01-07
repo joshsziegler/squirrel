@@ -174,11 +174,19 @@ func FromSQL(s string) (Datatype, error) {
 
 type Table struct {
 	SchemaName  string
-	Name        string
+	sqlName     string
+	goName      string
 	Temp        bool
 	IfNotExists bool
 	Columns     []Column
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
+}
+
+func (t *Table) GoName() string  { return t.goName }
+func (t *Table) SQLName() string { return t.sqlName }
+func (t *Table) SetSQLName(name string) {
+	t.sqlName = name
+	t.goName = ToGoName(name)
 }
 
 // PrimaryKey if one is defined (assumes it is one column, and not multi-column).
@@ -199,7 +207,7 @@ func (t *Table) InsertColumns() []string {
 		if col.DBGenerated() {
 			continue
 		}
-		cols = append(cols, col.Name)
+		cols = append(cols, col.sqlName)
 	}
 	return cols
 }
@@ -212,7 +220,7 @@ func (t *Table) UpdateColumns() []string {
 		if col.DBGenerated() {
 			continue
 		}
-		cols = append(cols, col.Name)
+		cols = append(cols, col.sqlName)
 	}
 	return cols
 }
@@ -245,7 +253,8 @@ func (a OnFkAction) String() string {
 }
 
 type Column struct {
-	Name       string
+	sqlName    string
+	goName     string
 	Type       Datatype
 	PrimaryKey bool
 	Nullable   bool
@@ -261,15 +270,22 @@ type Column struct {
 	DefaultBool   sql.NullBool
 }
 
+func (t *Column) GoName() string  { return t.goName }
+func (t *Column) SQLName() string { return t.sqlName }
+func (t *Column) SetSQLName(name string) {
+	t.sqlName = name
+	t.goName = ToGoName(name)
+}
+
 // DBGenerated returns true if the database creates this column, such as row IDs, or
 // created/updates_at metadata.
 func (c *Column) DBGenerated() bool {
 	switch {
 	case c.PrimaryKey:
 		return true
-	case c.Name == "created_at":
+	case c.sqlName == "created_at":
 		return true
-	case c.Name == "updated_at":
+	case c.sqlName == "updated_at":
 		return true
 	default:
 		return false

@@ -81,7 +81,7 @@ var (
 
 // TableToGo converts a Table to its Go-ORM layer.
 func TableToGo(w ShortWriter, t *Table) {
-	goName := ToGoName(t.Name)
+	goName := ToGoName(t.sqlName)
 
 	insertCols := t.InsertColumns()
 	insertColListA := strings.Join(insertCols, ", ")
@@ -105,7 +105,7 @@ func TableToGo(w ShortWriter, t *Table) {
 		}
 	}
 
-	w.F("// %s represents a row from '%s'\n", goName, t.Name)
+	w.F("// %s represents a row from '%s'\n", goName, t.sqlName)
 	if t.Comment != "" {
 		w.F("// Schema Comment: %s\n", t.Comment)
 	}
@@ -137,18 +137,18 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N(`    case x._deleted:`)
 	w.N(`        return merry.Wrap(ErrInsertMarkedForDeletion)`)
 	w.N(`    }`)
-	if pk != nil && pk.Name == "ID" { // TODO: Handle auto-generated 'rowid'
+	if pk != nil && pk.SQLName() == "ID" { // TODO: Handle auto-generated 'rowid'
 		w.N("    res, err := dbc.NamedExecContext(ctx, `")
 	} else {
 		w.N("    _, err := dbc.NamedExecContext(ctx, `")
 	}
-	w.F("        INSERT INTO %s (%s)\n", t.Name, insertColListA)
+	w.F("        INSERT INTO %s (%s)\n", t.sqlName, insertColListA)
 	w.F("        VALUES (%s)\n", insertColListB)
 	w.N(")`, x)")
 	w.N("if err != nil {")
 	w.N("	return err")
 	w.N("}")
-	if pk != nil && pk.Name == "ID" { // TODO: Handle auto-generated 'rowid'
+	if pk != nil && pk.sqlName == "ID" { // TODO: Handle auto-generated 'rowid'
 		w.N("id, err := res.LastInsertId()")
 		w.N("if err != nil {")
 		w.N("	return err")
@@ -172,9 +172,9 @@ func TableToGo(w ShortWriter, t *Table) {
 		w.N("}")
 		w.N("// update with primary key")
 		w.N("_, err := dbc.NamedExecContext(ctx, `")
-		w.F("        UPDATE %s (%s)\n", t.Name, updateColListA)
+		w.F("        UPDATE %s (%s)\n", t.sqlName, updateColListA)
 		w.F("        VALUES (%s)\n", updateColListB)
-		w.F("        WHERE %s=:%s`, x)\n", pk.Name, pk.Name) // TODO: How to determine PK, or composite PK?
+		w.F("        WHERE %s=:%s`, x)\n", pk.sqlName, pk.sqlName) // TODO: How to determine PK, or composite PK?
 		w.N("if err != nil {")
 		w.N("	return err")
 		w.N("}")
@@ -198,7 +198,7 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("		return merry.Wrap(ErrUpsertMarkedForDeletion)")
 	w.N("	}")
 	w.N("	_, err := dbc.NamedExecContext(ctx, `")
-	w.F("		INSERT INTO %s (ip, time)\n", t.Name) // FIXME: Not done...
+	w.F("		INSERT INTO %s (ip, time)\n", t.sqlName) // FIXME: Not done...
 	w.N("		VALUES (:ip, :time)")
 	w.N("		ON CONFLICT (ip, time)")
 	w.N("		DO UPDATE SET ip = EXCLUDED.ip, time=EXCLUDED.time`, x)")
@@ -220,7 +220,7 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("	return nil")
 	w.N("}")
 	w.N("_, err := dbc.NamedExecContext(ctx, `")
-	w.F("        DELETE FROM %s\n", t.Name)
+	w.F("        DELETE FROM %s\n", t.sqlName)
 	w.F("        WHERE id = :id`, x)\n") // TODO: How to determine PK, or composite PK?
 	w.N("if err != nil {")
 	w.N("	return err")
@@ -259,5 +259,5 @@ func ColumnToGo(w ShortWriter, c *Column) {
 		comment = fmt.Sprintf("// %s", strings.Join(commentParts, ", "))
 	}
 
-	w.F("    %s %s %s\n", ToGoName(c.Name), c.Type.ToGo(c.Nullable), comment)
+	w.F("    %s %s %s\n", ToGoName(c.sqlName), c.Type.ToGo(c.Nullable), comment)
 }

@@ -128,9 +128,9 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 	if tokens.Peek(1) == "." {
 		t.SchemaName = removeQuotes(tokens.Take())
 		tokens.Take() // period delimiter
-		t.Name = removeQuotes(tokens.Take())
+		t.SetSQLName(removeQuotes(tokens.Take()))
 	} else {
-		t.Name = removeQuotes(tokens.Take())
+		t.SetSQLName(removeQuotes(tokens.Take()))
 	}
 	// TODO: Handle "AS SELECT STMT" ?
 	// Opening parenthesis for column definitions
@@ -186,7 +186,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 	}
 
 	// Name
-	c.Name = removeQuotes(tokens.Take())
+	c.SetSQLName(removeQuotes(tokens.Take()))
 	// Data Type
 	err := parseColumnDataType(tokens, &c, true)
 	if err != nil {
@@ -289,7 +289,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 	dt, err := FromSQL(tokens.Next())
 	if err != nil {
-		return fmt.Errorf("column '%s' must use a valid type, not %s", c.Name, tokens.Next())
+		return fmt.Errorf("column '%s' must use a valid type, not %s", c.SQLName(), tokens.Next())
 	}
 	c.Type = dt
 	tokens.Take()
@@ -308,7 +308,7 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 		c.ForeignKey.Column = tokens.Peek(1)
 		tokens.TakeN(3)
 	} else {
-		c.ForeignKey.Column = c.Name // Not specified, so it should be the same name as THIS column name.
+		c.ForeignKey.Column = c.SQLName() // Not specified, so it should be the same name as THIS column name.
 	}
 	// ON UPDATE/ON DELETE (can have multiple)
 	for {

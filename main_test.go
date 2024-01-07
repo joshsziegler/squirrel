@@ -20,9 +20,10 @@ func TestParse(t *testing.T) {
 			`CREATE TABLE users ( name TEXT PRIMARY KEY )`, false,
 			[]*Table{
 				{
-					Name: "users",
+					sqlName: "users",
+					goName:  "User",
 					Columns: []Column{
-						{Name: "name", Type: TEXT, PrimaryKey: true, Nullable: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: true},
 					},
 				},
 			},
@@ -32,9 +33,10 @@ func TestParse(t *testing.T) {
 			`CREATE TABLE users ( name TEXT PRIMARY KEY NOT NULL)`, false,
 			[]*Table{
 				{
-					Name: "users",
+					sqlName: "users",
+					goName:  "User",
 					Columns: []Column{
-						{Name: "name", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
 					},
 				},
 			},
@@ -48,10 +50,11 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "users",
+					sqlName: "users",
+					goName:  "User",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "name", Type: TEXT, PrimaryKey: false, Nullable: true, Unique: true},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: true, Unique: true},
 					},
 				},
 			},
@@ -65,10 +68,11 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "jobs",
+					sqlName: "jobs",
+					goName:  "Job",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "num_nodes", Type: INT, PrimaryKey: false, Nullable: true},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "num_nodes", goName: "NumNode", Type: INT, PrimaryKey: false, Nullable: true},
 					},
 				},
 			},
@@ -81,10 +85,11 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name:    "foo",
+					sqlName: "foo",
+					goName:  "Foo",
 					Comment: "Hello world!",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
 					},
 				},
 			},
@@ -99,11 +104,12 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "comments",
+					sqlName: "comments",
+					goName:  "Comment",
 					Columns: []Column{
-						{Name: "foo", Type: TEXT, Nullable: true, Comment: "no space between delimiter and first word"},
-						{Name: "bar", Type: TEXT, Nullable: true, Comment: "no space after comma ending the column definition"},
-						{Name: "baz", Type: TEXT, Nullable: true, Comment: "No space on either side"},
+						{sqlName: "foo", goName: "Foo", Type: TEXT, Nullable: true, Comment: "no space between delimiter and first word"},
+						{sqlName: "bar", goName: "Bar", Type: TEXT, Nullable: true, Comment: "no space after comma ending the column definition"},
+						{sqlName: "baz", goName: "Baz", Type: TEXT, Nullable: true, Comment: "No space on either side"},
 					},
 				},
 			},
@@ -118,12 +124,13 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "bars",
+					sqlName: "bars",
+					goName:  "Bar",
 					Columns: []Column{
-						{Name: "name", Type: TEXT, PrimaryKey: false, Nullable: false, Unique: true, Comment: "name of the bar"},
-						{Name: "open", Type: INT, PrimaryKey: false, Nullable: true, Unique: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false, Unique: true, Comment: "name of the bar"},
+						{sqlName: "open", goName: "Open", Type: INT, PrimaryKey: false, Nullable: true, Unique: false},
 						// FIXME: Lexer/Parser turns this comment from "(1-24)" to "( 1-24 )"
-						{Name: "close", Type: INT, PrimaryKey: false, Nullable: true, Unique: false, Comment: "Hour ( 1-24 ) the bar closes if known"},
+						{sqlName: "close", goName: "Close", Type: INT, PrimaryKey: false, Nullable: true, Unique: false, Comment: "Hour ( 1-24 ) the bar closes if known"},
 					},
 				},
 			},
@@ -142,15 +149,16 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "animals",
+					sqlName: "animals",
+					goName:  "Animal",
 					Columns: []Column{
-						{Name: "name", Type: TEXT, PrimaryKey: true, Nullable: false},
-						{Name: "age", Type: INT, Nullable: false},
-						{Name: "weight", Type: FLOAT, Nullable: false},
-						{Name: "height", Type: INT, Nullable: false},
-						{Name: "last_seen", Type: DATETIME, Nullable: true},
-						{Name: "photo", Type: BLOB, Nullable: true},
-						{Name: "data", Type: BLOB, Nullable: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "age", goName: "Age", Type: INT, Nullable: false},
+						{sqlName: "weight", goName: "Weight", Type: FLOAT, Nullable: false},
+						{sqlName: "height", goName: "Height", Type: INT, Nullable: false},
+						{sqlName: "last_seen", goName: "LastSeen", Type: DATETIME, Nullable: true},
+						{sqlName: "photo", goName: "Photo", Type: BLOB, Nullable: true},
+						{sqlName: "data", goName: "Datum", Type: BLOB, Nullable: true},
 					},
 				},
 			},
@@ -174,11 +182,12 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "people",
+					sqlName: "people",
+					goName:  "Person",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "name", Type: TEXT, Nullable: false, Comment: "Name may not be unique!"},
-						{Name: "spouse", Type: INT, Nullable: true, ForeignKey: &ForeignKey{Table: "people", Column: "id"}, Comment: "Husband or Wife within this table"},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Comment: "Name may not be unique!"},
+						{sqlName: "spouse", goName: "Spouse", Type: INT, Nullable: true, ForeignKey: &ForeignKey{Table: "people", Column: "id"}, Comment: "Husband or Wife within this table"},
 					},
 				},
 			},
@@ -199,17 +208,18 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "product",
+					sqlName: "product",
+					goName:  "Product",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "name", Type: TEXT, Nullable: false, Unique: true},
-						{Name: "type", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: "software"}},
-						{Name: "description", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: ""}, Comment: "Empty string as the default"},
-						{Name: "discontinued", Type: BOOL, Nullable: false, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
-						{Name: "on_sale", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: true}, Comment: "true using integer notation"},
-						{Name: "magic", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: true}},
-						{Name: "stolen", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
-						{Name: "intelligent", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "type", goName: "Type", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: "software"}},
+						{sqlName: "description", goName: "Description", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: ""}, Comment: "Empty string as the default"},
+						{sqlName: "discontinued", goName: "Discontinued", Type: BOOL, Nullable: false, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+						{sqlName: "on_sale", goName: "OnSale", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: true}, Comment: "true using integer notation"},
+						{sqlName: "magic", goName: "Magic", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: true}},
+						{sqlName: "stolen", goName: "Stolen", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+						{sqlName: "intelligent", goName: "Intelligent", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
 					},
 				},
 			},
@@ -232,25 +242,28 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "boxes",
+					sqlName: "boxes",
+					goName:  "Box",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "name", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: true},
 					},
 				},
 				{
-					Name: "franchises",
+					sqlName: "franchises",
+					goName:  "Franchise",
 					Columns: []Column{
-						{Name: "name", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
 					},
 				},
 				{
-					Name: "toys",
+					sqlName: "toys",
+					goName:  "Toy",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "name", Type: TEXT, Nullable: false, Unique: false},
-						{Name: "box_id", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "boxes", Column: "id", OnDelete: Cascade}},
-						{Name: "franchise_name", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "franchises", Column: "name", OnUpdate: Cascade, OnDelete: SetNull}},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: false},
+						{sqlName: "box_id", goName: "BoxID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "boxes", Column: "id", OnDelete: Cascade}},
+						{sqlName: "franchise_name", goName: "FranchiseName", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "franchises", Column: "name", OnUpdate: Cascade, OnDelete: SetNull}},
 					},
 				},
 			},
@@ -272,23 +285,26 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "users",
+					sqlName: "users",
+					goName:  "User",
 					Columns: []Column{
-						{Name: "user_id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "name", Type: TEXT, Nullable: false},
+						{sqlName: "user_id", goName: "UserID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false},
 					},
 				},
 				{
-					Name: "groups",
+					sqlName: "groups",
+					goName:  "Group",
 					Columns: []Column{
-						{Name: "group_name", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "group_name", goName: "GroupName", Type: TEXT, PrimaryKey: true, Nullable: false},
 					},
 				},
 				{
-					Name: "user_group",
+					sqlName: "user_group",
+					goName:  "UserGroup",
 					Columns: []Column{
-						{Name: "user_id", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "users", Column: "user_id"}, Comment: "Column name is implied by omitting it"},
-						{Name: "group_name", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "groups", Column: "group_name"}},
+						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "users", Column: "user_id"}, Comment: "Column name is implied by omitting it"},
+						{sqlName: "group_name", goName: "GroupName", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "groups", Column: "group_name"}},
 					},
 				},
 			},
@@ -305,12 +321,13 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name:        "albums",
+					sqlName:     "albums",
+					goName:      "Album",
 					IfNotExists: true,
 					Columns: []Column{
-						{Name: "artist", Type: TEXT, PrimaryKey: false, Nullable: false},
-						{Name: "album_title", Type: TEXT, PrimaryKey: false, Nullable: false},
-						{Name: "year", Type: INT, PrimaryKey: false, Nullable: false},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "album_title", goName: "AlbumTitle", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "year", goName: "Year", Type: INT, PrimaryKey: false, Nullable: false},
 					},
 				},
 			},
@@ -326,11 +343,12 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name:        "players",
+					sqlName:     "players",
+					goName:      "Player",
 					IfNotExists: true,
 					Columns: []Column{
-						{Name: "server", Type: INT, PrimaryKey: false, Nullable: false},
-						{Name: "character_name", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "server", goName: "Server", Type: INT, PrimaryKey: false, Nullable: false},
+						{sqlName: "character_name", goName: "CharacterName", Type: TEXT, PrimaryKey: false, Nullable: false},
 					},
 				},
 			},
@@ -347,11 +365,12 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "albums",
+					sqlName: "albums",
+					goName:  "Album",
 					Columns: []Column{
-						{Name: "artist", Type: TEXT, PrimaryKey: false, Nullable: false},
-						{Name: "name", Type: TEXT, PrimaryKey: false, Nullable: false},
-						{Name: "year", Type: INT, PrimaryKey: false, Nullable: true},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "year", goName: "Year", Type: INT, PrimaryKey: false, Nullable: true},
 					},
 				},
 			},
@@ -368,10 +387,11 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "job_extended_attrs",
+					sqlName: "job_extended_attrs",
+					goName:  "JobExtendedAttr",
 					Columns: []Column{
-						{Name: "fk_job_id", Type: TEXT, PrimaryKey: false, Nullable: false},
-						{Name: "auto_extend", Type: INT, Nullable: false},
+						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "auto_extend", goName: "AutoExtend", Type: INT, Nullable: false},
 					},
 				},
 			},
@@ -389,11 +409,12 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "users",
+					sqlName: "users",
+					goName:  "User",
 					Columns: []Column{
-						{Name: "name", Type: TEXT, PrimaryKey: true, Nullable: false},
-						{Name: "email", Type: TEXT},
-						{Name: "role", Type: TEXT},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "email", goName: "Email", Type: TEXT},
+						{sqlName: "role", goName: "Role", Type: TEXT},
 					},
 				},
 			},
@@ -409,11 +430,12 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					Name: "login_attempts",
+					sqlName: "login_attempts",
+					goName:  "LoginAttempt",
 					Columns: []Column{
-						{Name: "id", Type: INT, PrimaryKey: true, Nullable: false},
-						{Name: "ip", Type: TEXT, Nullable: false},
-						{Name: "time", Type: DATETIME, Nullable: false},
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false},
+						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
 					},
 				},
 			},
