@@ -1,122 +1,16 @@
-package main
+package templates
 
 import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/joshsziegler/squirrel/parser"
 )
 
-// ShortWriter allows simplified use of fmt.Fprintln() and fmt.Fprintf with an
-// io.Writer to make the code easier to read, especially large blocks.
-type ShortWriter struct {
-	w io.Writer
-}
+func Header(writer io.Writer, pkgName string) {
+	w := NewShortWriter(writer)
 
-// N ~ Newline
-func (x *ShortWriter) N(s string) {
-	fmt.Fprintln(x.w, s)
-}
-
-// F ~ Format
-func (x *ShortWriter) F(format string, a ...any) {
-	fmt.Fprintf(x.w, format, a...)
-}
-
-// WherePKs returns the where clause for the table provided, such as:
-// "WHERE id=:id" or "WHERE artist=:artist, album=:album"
-func WherePKs(t *Table) string {
-	res := ""
-	pks := t.PrimaryKeys()
-	for i, col := range pks {
-		if i > 0 {
-			res += ", "
-		}
-		res += fmt.Sprintf("%s=:%s", col.SQLName(), col.SQLName())
-	}
-	return res
-}
-
-// InsertColumns returns the column list for INSERT or VALUES, depending on the last param.
-func InsertColumns(t *Table, value bool) string {
-	res := ""
-	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue // skip
-		}
-		if res != "" {
-			res += ", "
-		}
-		if value {
-			res += ":"
-		}
-		res += col.SQLName()
-	}
-	return res
-}
-
-// UpdateColumns returns the column list for UPDATE or VALUES, depending on the last param.
-// TODO: Update update_at if used!
-func UpdateColumns(t *Table, value bool) string {
-	res := ""
-	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue // skip
-		}
-		if res != "" {
-			res += ", "
-		}
-		if value {
-			res += ":"
-		}
-		res += col.SQLName()
-	}
-	return res
-}
-
-// UpsertUpdateColumns returns the column list for DO UPDATE SET.
-// TODO: Update update_at if used!
-func UpsertUpdateColumns(t *Table) string {
-	res := ""
-	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue // skip
-		}
-		if res != "" {
-			res += ", "
-		}
-		res += fmt.Sprintf("%s=EXCLUDED.%s", col.SQLName(), col.SQLName())
-	}
-	return res
-}
-
-// UpsertConflictColumns returns the column list for an UPSERT's ON CONFLICT clause.
-//
-// TODO: Exclude auto-increment PKs such as row_id or ID.
-//
-// From the SQLite Docs:
-//
-//	The UPSERT processing happens only for uniqueness constraints. A "uniqueness constraint" is an
-//	explicit UNIQUE or PRIMARY KEY constraint within the CREATE TABLE statement, or a unique
-//	index. UPSERT does not intervene for failed NOT NULL, CHECK, or foreign key constraints or for
-//	constraints that are implemented using triggers.
-//		~ https://www.sqlite.org/lang_upsert.html
-func UpsertConflictColumns(t *Table) string {
-	cols := []string{}
-	pks := t.PrimaryKeys()
-	for _, col := range pks {
-		if !col.AutoIncrement() { // Do not include auto-incrementing columns (e.g. rowid)
-			cols = append(cols, col.SQLName())
-		}
-	}
-	for _, col := range t.Columns {
-		if col.Unique {
-			cols = append(cols, col.SQLName())
-		}
-	}
-	return strings.Join(cols, ", ")
-}
-
-func Header(w ShortWriter, pkgName string) {
 	w.F("package %s\n\n", pkgName)
 	w.N(`
 import (
@@ -169,15 +63,17 @@ var (
 `)
 }
 
-// TableToGo converts a Table to its Go-ORM layer.
-func TableToGo(w ShortWriter, t *Table) {
+// Table converts a Table to its Go-access-layer.
+func Table(writer io.Writer, t *parser.Table) {
+	w := NewShortWriter(writer)
+
 	w.F("// %s represents a row from '%s'\n", t.GoName(), t.SQLName())
 	if t.Comment != "" {
 		w.F("// Schema Comment: %s\n", t.Comment)
 	}
 	w.F("type %s struct {\n", t.GoName())
 	for _, c := range t.Columns {
-		ColumnToGo(w, &c)
+		columnToGo(w, &c)
 	}
 	w.N(`	_exists, _deleted bool // In-memory-only metadata on this row's status in the DB`)
 	w.N("}")
@@ -296,9 +192,9 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("}")
 }
 
-// ColumnToGo converts a Column to its Go-ORM layer.
+// columnToGo converts a Column to its Go-ORM layer.
 // Adds a comment about whether this column is Unique, has a Default, and the SQL comment
-func ColumnToGo(w ShortWriter, c *Column) {
+func columnToGo(w *ShortWriter, c *parser.Column) {
 	commentParts := []string{}
 	if c.PrimaryKey {
 		commentParts = append(commentParts, "PK")
@@ -325,5 +221,5 @@ func ColumnToGo(w ShortWriter, c *Column) {
 		comment = fmt.Sprintf("// %s", strings.Join(commentParts, ", "))
 	}
 
-	w.F("	%s %s %s\n", ToGoName(c.SQLName()), c.Type.ToGo(c.Nullable), comment)
+	w.F("	%s %s %s\n", c.GoName(), c.Type.ToGo(c.Nullable), comment)
 }

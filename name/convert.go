@@ -1,4 +1,4 @@
-package main
+package name
 
 import (
 	"strings"
@@ -23,8 +23,8 @@ var (
 	}
 )
 
-// ToGoName converts a snake_case name to CamelCase -- per Go conventions -- and singularizes it.
-func ToGoName(s string) string {
+// ToGo converts a snake_case name to CamelCase -- per Go conventions -- and singularizes it.
+func ToGo(s string) string {
 	s = strings.ToLower(s) // Convert to lowercase to match against acronyms
 	words := strings.Split(s, "_")
 	name := ""
