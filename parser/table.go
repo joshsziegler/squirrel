@@ -53,6 +53,15 @@ func (t *Table) SetPrimaryKeys(colNames []string) error {
 }
 
 // PrimaryKeys returns the column(s).
+//
+//	WARNING:: SQLite Docs (https://www.sqlite.org/lang_createtable.html):
+//
+//	According to the SQL standard, PRIMARY KEY should always imply NOT NULL. Unfortunately, due
+//	to a bug in some early versions, this is not the case in SQLite. Unless the column is an
+//	INTEGER PRIMARY KEY or the table is a WITHOUT ROWID table or a STRICT table or the column is
+//	declared NOT NULL, SQLite allows NULL values in a PRIMARY KEY column. SQLite could be fixed
+//	to conform to the standard, but doing so might break legacy applications. Hence, it has been
+//	decided to merely document the fact that SQLite allows NULLs in most PRIMARY KEY columns.
 func (t *Table) PrimaryKeys() []*Column {
 	pks := []*Column{}
 	for _, col := range t.Columns {

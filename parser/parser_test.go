@@ -464,6 +464,24 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"default bool with parenthesis",
+			`CREATE TABLE posts (
+				title TEXT PRIMARY KEY NOT NULL,
+				public BOOL DEFAULT (FALSE)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "posts",
+					goName:  "Post",
+					Columns: []Column{
+						{sqlName: "title", goName: "Title", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "public", goName: "Public", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

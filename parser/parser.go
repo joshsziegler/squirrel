@@ -259,6 +259,10 @@ func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 				}
 			case BOOL:
 				token := tokens.Take()
+				if token == "(" && tokens.Peek(1) == ")" { // FIXME: Better handle expressions
+					token = tokens.Take() // This should be TRUE or FALSE
+					tokens.Take()         // Take closing parenthesis
+				}
 				switch token {
 				case "NULL":
 					// TODO: How to mark explicitly as DEFAULTS TO NULL?
