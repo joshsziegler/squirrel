@@ -71,6 +71,10 @@ func Table(writer io.Writer, t *parser.Table) {
 	if t.Comment != "" {
 		w.F("// Schema Comment: %s\n", t.Comment)
 	}
+	if len(t.PrimaryKeys()) < 1 {
+		w.N("//")
+		w.N("// Update, Save, Upsert, and Delete methods not provided because we were unable to determine a PK")
+	}
 	w.F("type %s struct {\n", t.GoName())
 	for _, c := range t.Columns {
 		columnToGo(w, &c)
@@ -119,9 +123,7 @@ func Table(writer io.Writer, t *parser.Table) {
 	w.N("	return nil")
 	w.N(`}`)
 
-	if len(t.PrimaryKeys()) < 1 {
-		w.N("// Update and Save methods not provided because we were unable to determine a PK\n\n")
-	} else {
+	if len(t.PrimaryKeys()) > 0 {
 		// UPDATE
 		w.N("// Update this row in the database.")
 		w.F("func (x *%s) Update(ctx context.Context, dbc DB) error {\n", t.GoName())
@@ -150,46 +152,47 @@ func Table(writer io.Writer, t *parser.Table) {
 		w.N("	}")
 		w.N("	return x.Insert(ctx, dbc)")
 		w.N("}")
+
+		// UPSERT
+		w.N("// Upsert this row to the database.")
+		w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", t.GoName())
+		w.N("	switch {")
+		w.N("	case x._deleted: // deleted")
+		w.N("		return ErrUpsertMarkedForDeletion")
+		w.N("	}")
+		w.N("	_, err := dbc.NamedExecContext(ctx, `")
+		w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
+		w.F("		VALUES (%s)\n", InsertColumns(t, true))
+		w.F("		ON CONFLICT (%s)\n", UpsertConflictColumns(t))
+		w.F("		DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
+		w.N("	if err != nil {")
+		w.N("		return err")
+		w.N("	}")
+		w.N("	// set exists")
+		w.N("	x._exists = true")
+		w.N("	return nil")
+		w.N("}")
+
+		// DELETE
+		w.N("// Delete this row from the database.")
+		w.F("func (x *%s) Delete(ctx context.Context, dbc DB) error {\n", t.GoName())
+		w.N("	switch {")
+		w.N("	case !x._exists: // doesn't exist")
+		w.N("		return nil")
+		w.N("	case x._deleted:")
+		w.N("		return nil")
+		w.N("	}")
+		w.N("	_, err := dbc.NamedExecContext(ctx, `")
+		w.F("			DELETE FROM %s\n", t.SQLName())
+		w.F("			WHERE %s`, x)\n", WherePKs(t))
+		w.N("	if err != nil {")
+		w.N("		return err")
+		w.N("	}")
+		w.N("	x._deleted = true")
+		w.N("	return nil")
+		w.N("}")
 	}
 
-	// UPSERT
-	w.N("// Upsert this row to the database.")
-	w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", t.GoName())
-	w.N("	switch {")
-	w.N("	case x._deleted: // deleted")
-	w.N("		return ErrUpsertMarkedForDeletion")
-	w.N("	}")
-	w.N("	_, err := dbc.NamedExecContext(ctx, `")
-	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
-	w.F("		VALUES (%s)\n", InsertColumns(t, true))
-	w.F("		ON CONFLICT (%s)\n", UpsertConflictColumns(t))
-	w.F("		DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
-	w.N("	if err != nil {")
-	w.N("		return err")
-	w.N("	}")
-	w.N("	// set exists")
-	w.N("	x._exists = true")
-	w.N("	return nil")
-	w.N("}")
-
-	// DELETE
-	w.N("// Delete this row from the database.")
-	w.F("func (x *%s) Delete(ctx context.Context, dbc DB) error {\n", t.GoName())
-	w.N("	switch {")
-	w.N("	case !x._exists: // doesn't exist")
-	w.N("		return nil")
-	w.N("	case x._deleted:")
-	w.N("		return nil")
-	w.N("	}")
-	w.N("	_, err := dbc.NamedExecContext(ctx, `")
-	w.F("			DELETE FROM %s\n", t.SQLName())
-	w.F("			WHERE %s`, x)\n", WherePKs(t))
-	w.N("	if err != nil {")
-	w.N("		return err")
-	w.N("	}")
-	w.N("	x._deleted = true")
-	w.N("	return nil")
-	w.N("}")
 }
 
 // columnToGo converts a Column to its Go-ORM layer.
