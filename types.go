@@ -180,7 +180,6 @@ type Table struct {
 	IfNotExists bool
 	Columns     []Column
 	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
-	primaryKeys []string
 }
 
 func (t *Table) GoName() string  { return t.goName }
@@ -190,28 +189,53 @@ func (t *Table) SetSQLName(name string) {
 	t.goName = ToGoName(name)
 }
 
+// SetPrimaryKeys takes a slice of column name(s) and verifies they exist and sets their metadata accordingly.
+// The columns MUST be defined by the time this method is called.
 func (t *Table) SetPrimaryKeys(colNames []string) error {
-	if len(t.primaryKeys) > 0 {
-		return fmt.Errorf("table cannot have more than one primary key definition")
-	}
 	if len(colNames) < 1 {
 		return fmt.Errorf("must provide at least one column name for primary key(s)")
 	}
-	t.primaryKeys = colNames
+	makeCompositePK := len(colNames) > 1
+	// Make the error message friendlier by storing the columns we DO find in the same order they are specified
+	foundCols := []string{}
+	for _, colName := range colNames {
+		for i, col := range t.Columns {
+			if colName == col.SQLName() {
+				if makeCompositePK {
+					t.Columns[i].CompositePrimaryKey = true
+				} else {
+					t.Columns[i].PrimaryKey = true
+				}
+				foundCols = append(foundCols, col.SQLName())
+				break // stop searching for this column
+			}
+		}
+	}
+	if len(colNames) != len(foundCols) {
+		return fmt.Errorf("could not find all columns for the composite primary key (%v); found (%v)", colNames, foundCols)
+	}
 	return nil
 }
 
-// PrimaryKeys returns the column name(s).
-func (t *Table) PrimaryKeys() []string {
-	if len(t.primaryKeys) > 0 {
-		return t.primaryKeys
-	}
+// PrimaryKeys returns the column(s).
+func (t *Table) PrimaryKeys() []*Column {
+	pks := []*Column{}
 	for _, col := range t.Columns {
 		if col.PrimaryKey {
-			return []string{col.sqlName}
+			return []*Column{&col} // TODO: Should we continue to search in case of an error where multiple are defined?
+		}
+		if col.CompositePrimaryKey {
+			pks = append(pks, &col)
 		}
 	}
-	return []string{} // None found
+	return pks
+}
+
+// PrimaryKeyAutoIncrements returns true if there is a single Primary Key column
+// -- it is not a composite PK -- and it auto-increments (e.g. rowid, or ID).
+func (t *Table) PrimaryKeyAutoIncrements() bool {
+	pks := t.PrimaryKeys()
+	return len(pks) == 1 && pks[0].AutoIncrement()
 }
 
 type OnFkAction int // OnFkAction represent all possible actions to take on a Foreign KEY (DELETE|UPDATE)
@@ -242,13 +266,15 @@ func (a OnFkAction) String() string {
 }
 
 type Column struct {
-	sqlName    string
-	goName     string
-	Type       Datatype
-	PrimaryKey bool
-	Nullable   bool
-	Unique     bool
-	Comment    string // Comment at the end of this column definition if provided.
+	sqlName             string
+	goName              string
+	Type                Datatype
+	PrimaryKey          bool // True if this column is the one and only primary key (typically defined inline with the column).
+	CompositePrimaryKey bool // True if this column is part of a composite primary key.
+	autoIncrement       bool // AutoIncrement is true if the this column explicitly specified AUTOINCREMENT. Use AutoIncrement()!
+	Nullable            bool
+	Unique              bool
+	Comment             string // Comment at the end of this column definition if provided.
 
 	ForeignKey *ForeignKey // ForeignKey or null.
 
@@ -279,6 +305,30 @@ func (c *Column) DBGenerated() bool {
 	default:
 		return false
 	}
+}
+
+// AutoIncrement is true if the column explicitly defined or SQLite's deems it to be a row_id alias.
+//
+// My understanding of the docs is that any column that is both a PK and type INTEGER will be auto-
+// incremented, regardless of whether it specifies "AUTOINCREMENT". The keyword only affects how the
+// ID is chosen.
+//
+// SQLite Docs (https://www.sqlite.org/autoinc.html):
+//
+//  1. The AUTOINCREMENT keyword imposes extra CPU, memory, disk space, and disk I/O overhead and
+//     should be avoided if not strictly needed. It is usually not needed.
+//  2. In SQLite, a column with type INTEGER PRIMARY KEY is an alias for the ROWID (except in
+//     WITHOUT ROWID tables) which is always a 64-bit signed integer.
+//  3. On an INSERT, if the ROWID or INTEGER PRIMARY KEY column is not explicitly given a value,
+//     then it will be filled automatically with an unused integer, usually one more than the
+//     largest ROWID currently in use. This is true regardless of whether or not the AUTOINCREMENT
+//     keyword is used.
+//  4. If the AUTOINCREMENT keyword appears after INTEGER PRIMARY KEY, that changes the automatic
+//     ROWID assignment algorithm to prevent the reuse of ROWIDs over the lifetime of the database
+//     In other words, the purpose of AUTOINCREMENT is to prevent the reuse of ROWIDs from
+//     previously deleted rows.
+func (c *Column) AutoIncrement() bool {
+	return c.PrimaryKey && c.Type == INT
 }
 
 type ForeignKey struct {

@@ -31,7 +31,7 @@ func WherePKs(t *Table) string {
 		if i > 0 {
 			res += ", "
 		}
-		res += fmt.Sprintf("%s=:%s", col, col)
+		res += fmt.Sprintf("%s=:%s", col.SQLName(), col.SQLName())
 	}
 	return res
 }
@@ -70,6 +70,33 @@ func UpdateColumns(t *Table, value bool) string {
 		res += col.SQLName()
 	}
 	return res
+}
+
+// UpsertConflictColumns returns the column list for an UPSERT's ON CONFLICT clause.
+//
+// TODO: Exclude auto-increment PKs such as row_id or ID.
+//
+// From the SQLite Docs:
+//
+//	The UPSERT processing happens only for uniqueness constraints. A "uniqueness constraint" is an
+//	explicit UNIQUE or PRIMARY KEY constraint within the CREATE TABLE statement, or a unique
+//	index. UPSERT does not intervene for failed NOT NULL, CHECK, or foreign key constraints or for
+//	constraints that are implemented using triggers.
+//		~ https://www.sqlite.org/lang_upsert.html
+func UpsertConflictColumns(t *Table) string {
+	cols := []string{}
+	pks := t.PrimaryKeys()
+	for _, col := range pks {
+		if !col.AutoIncrement() { // Do not include auto-incrementing columns (e.g. rowid)
+			cols = append(cols, col.SQLName())
+		}
+	}
+	for _, col := range t.Columns {
+		if col.Unique {
+			cols = append(cols, col.SQLName())
+		}
+	}
+	return strings.Join(cols, ", ")
 }
 
 func Header(w ShortWriter, pkgName string) {
@@ -149,9 +176,6 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("}")
 
 	// INSERT
-	pk := t.PrimaryKeys()
-	autoIncrementID := (pk != nil && len(pk) == 1 && pk[0] == "ID") // TODO: Handle auto-generated 'rowid'
-
 	w.N("// Insert this row into the database, returning an error on conflicts.")
 	w.N("// Use Upsert if a conflict should not result in an error.")
 	w.F("func (x *%s) Insert(ctx context.Context, dbc DB) error {\n", t.GoName())
@@ -161,7 +185,7 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N(`	case x._deleted:`)
 	w.N(`		return ErrInsertMarkedForDeletion`)
 	w.N(`	}`)
-	if autoIncrementID {
+	if t.PrimaryKeyAutoIncrements() {
 		w.N("	res, err := dbc.NamedExecContext(ctx, `")
 	} else {
 		w.N("	_, err := dbc.NamedExecContext(ctx, `")
@@ -171,7 +195,7 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("	if err != nil {")
 	w.N("		return err")
 	w.N("	}")
-	if autoIncrementID {
+	if t.PrimaryKeyAutoIncrements() {
 		w.N("	id, err := res.LastInsertId()")
 		w.N("	if err != nil {")
 		w.N("		return err")
@@ -182,9 +206,10 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("	return nil")
 	w.N(`}`)
 
-	if len(pk) < 1 {
+	if len(t.PrimaryKeys()) < 1 {
 		w.N("// Update and Save methods not provided because we were unable to determine a PK\n\n")
 	} else {
+		// UPDATE
 		w.N("// Update this row in the database.")
 		w.F("func (x *%s) Update(ctx context.Context, dbc DB) error {\n", t.GoName())
 		w.N("	switch {")
@@ -204,6 +229,7 @@ func TableToGo(w ShortWriter, t *Table) {
 		w.N("	return nil")
 		w.N("}")
 
+		// SAVE
 		w.N("// Save this row to the database, either using Insert or Update.")
 		w.F("func (x *%s) Save(ctx context.Context, dbc DB) error {", t.GoName())
 		w.N("	if x.Exists() {")
@@ -213,7 +239,7 @@ func TableToGo(w ShortWriter, t *Table) {
 		w.N("}")
 	}
 
-	// UPSERT
+	// UPSERT FIXME: Not Done
 	w.N("// Upsert this row to the database.")
 	w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", t.GoName())
 	w.N("	switch {")
@@ -221,10 +247,10 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.N("		return ErrUpsertMarkedForDeletion")
 	w.N("	}")
 	w.N("	_, err := dbc.NamedExecContext(ctx, `")
-	w.F("		INSERT INTO %s (ip, time)\n", t.SQLName()) // FIXME: Not done...
-	w.N("		VALUES (:ip, :time)")
-	w.N("		ON CONFLICT (ip, time)") // FIXME: DO I need to handle Unique in addition to PKs?
-	w.N("		DO UPDATE SET ip = EXCLUDED.ip, time=EXCLUDED.time`, x)")
+	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
+	w.F("		VALUES (%s)\n", InsertColumns(t, true))
+	w.F("		ON CONFLICT (%s)\n", UpsertConflictColumns(t))
+	w.N("		DO UPDATE SET ip = EXCLUDED.ip, time=EXCLUDED.time`, x)") // TODO: Update this line
 	w.N("	if err != nil {")
 	w.N("		return err")
 	w.N("	}")

@@ -324,10 +324,9 @@ func TestParse(t *testing.T) {
 					sqlName:     "albums",
 					goName:      "Album",
 					IfNotExists: true,
-					primaryKeys: []string{"artist", "album_title"},
 					Columns: []Column{
-						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false},
-						{sqlName: "album_title", goName: "AlbumTitle", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, CompositePrimaryKey: true, Nullable: false},
+						{sqlName: "album_title", goName: "AlbumTitle", Type: TEXT, PrimaryKey: false, CompositePrimaryKey: true, Nullable: false},
 						{sqlName: "year", goName: "Year", Type: INT, PrimaryKey: false, Nullable: false},
 					},
 				},
@@ -388,11 +387,10 @@ func TestParse(t *testing.T) {
 			false,
 			[]*Table{
 				{
-					sqlName:     "job_extended_attrs",
-					goName:      "JobExtendedAttr",
-					primaryKeys: []string{"fk_job_id"},
+					sqlName: "job_extended_attrs",
+					goName:  "JobExtendedAttr",
 					Columns: []Column{
-						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: true, Nullable: false},
 						{sqlName: "auto_extend", goName: "AutoExtend", Type: INT, Nullable: false},
 					},
 				},
