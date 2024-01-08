@@ -55,6 +55,7 @@ func InsertColumns(t *Table, value bool) string {
 }
 
 // UpdateColumns returns the column list for UPDATE or VALUES, depending on the last param.
+// TODO: Update update_at if used!
 func UpdateColumns(t *Table, value bool) string {
 	res := ""
 	for _, col := range t.Columns {
@@ -68,6 +69,22 @@ func UpdateColumns(t *Table, value bool) string {
 			res += ":"
 		}
 		res += col.SQLName()
+	}
+	return res
+}
+
+// UpsertUpdateColumns returns the column list for DO UPDATE SET.
+// TODO: Update update_at if used!
+func UpsertUpdateColumns(t *Table) string {
+	res := ""
+	for _, col := range t.Columns {
+		if col.DBGenerated() {
+			continue // skip
+		}
+		if res != "" {
+			res += ", "
+		}
+		res += fmt.Sprintf("%s=EXCLUDED.%s", col.SQLName(), col.SQLName())
 	}
 	return res
 }
@@ -239,7 +256,7 @@ func TableToGo(w ShortWriter, t *Table) {
 		w.N("}")
 	}
 
-	// UPSERT FIXME: Not Done
+	// UPSERT
 	w.N("// Upsert this row to the database.")
 	w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", t.GoName())
 	w.N("	switch {")
@@ -250,7 +267,7 @@ func TableToGo(w ShortWriter, t *Table) {
 	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
 	w.F("		VALUES (%s)\n", InsertColumns(t, true))
 	w.F("		ON CONFLICT (%s)\n", UpsertConflictColumns(t))
-	w.N("		DO UPDATE SET ip = EXCLUDED.ip, time=EXCLUDED.time`, x)") // TODO: Update this line
+	w.F("		DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
 	w.N("	if err != nil {")
 	w.N("		return err")
 	w.N("	}")
