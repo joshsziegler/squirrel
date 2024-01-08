@@ -164,13 +164,22 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			"invalid column type 'INTERGER'",
+			"invalid column type 'INTERGER' defaults to BLOB when STRICT is off",
 			`CREATE TABLE jobs (
 				id TEXT UNIQUE NOT NULL,
 				user_id INTERGER NOT NULL
 			);`,
-			true,
-			[]*Table{},
+			false,
+			[]*Table{
+				{
+					sqlName: "jobs",
+					goName:  "Job",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "user_id", goName: "UserID", Type: BLOB, Nullable: false},
+					},
+				},
+			},
 		},
 		{
 			"a Foreign Key specified with inline REFERENCES",
@@ -436,6 +445,21 @@ func TestParse(t *testing.T) {
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
 						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false},
 						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
+					},
+				},
+			},
+		},
+		{
+			"sqlite sequence table",
+			`CREATE TABLE sqlite_sequence ( name , seq ) ;`,
+			false,
+			[]*Table{
+				{
+					sqlName: "sqlite_sequence",
+					goName:  "SqliteSequence",
+					Columns: []Column{
+						{sqlName: "name", goName: "Name", Type: BLOB, Nullable: true},
+						{sqlName: "seq", goName: "Seq", Type: BLOB, Nullable: true},
 					},
 				},
 			},

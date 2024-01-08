@@ -7,6 +7,7 @@ import (
 )
 
 type Table struct {
+	Strict      bool // Strict is true if enabled. Defaults to false.
 	SchemaName  string
 	sqlName     string
 	goName      string

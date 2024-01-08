@@ -99,6 +99,7 @@ func parseComment(tokens *Tokens) string {
 // https://www.sqlite.org/syntax/create-table-stmt.html
 func parseCreateTable(tokens *Tokens) (*Table, error) {
 	t := &Table{
+		Strict:      false,
 		Temp:        false,
 		IfNotExists: false,
 		Columns:     make([]Column, 0),
@@ -168,7 +169,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 		case "FOREIGN": // table-constraint
 			parseTableConstraint(tokens, t)
 		default: // column-def
-			col, err := parseColumn(tokens)
+			col, err := parseColumn(tokens, t.Strict)
 			if err != nil {
 				return nil, err
 			}
@@ -178,7 +179,7 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 }
 
 // parseColumn
-func parseColumn(tokens *Tokens) (Column, error) {
+func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 	c := Column{
 		PrimaryKey: false,
 		Nullable:   true,
@@ -188,7 +189,7 @@ func parseColumn(tokens *Tokens) (Column, error) {
 	// Name
 	c.SetSQLName(removeQuotes(tokens.Take()))
 	// Data Type
-	err := parseColumnDataType(tokens, &c, true)
+	err := parseColumnDataType(tokens, &c, strict)
 	if err != nil {
 		return c, err
 	}
@@ -287,13 +288,48 @@ func parseColumn(tokens *Tokens) (Column, error) {
 // SQLite Docs: https://www.sqlite.org/datatype3.html
 // mattn/go-sqlit3 Docs: https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Supported_Types
 func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
-	dt, err := FromSQL(tokens.Next())
-	if err != nil {
-		return fmt.Errorf("column '%s' must use a valid type, not %s", c.SQLName(), tokens.Next())
+	s := tokens.Take()
+	switch s {
+	case "INT", "INTEGER":
+		c.Type = INT
+		return nil
+	case "FLOAT":
+		fallthrough
+	case "REAL":
+		c.Type = FLOAT
+		return nil
+	case "TEXT":
+		c.Type = TEXT
+		return nil
+	case "BLOB":
+		fallthrough
+	case "ANY":
+		c.Type = BLOB
+		return nil
+	case "BOOL", "BOOLEAN":
+		if strict {
+			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", s)
+		}
+		c.Type = BOOL
+		return nil
+	case "DATETIME", "TIMESTAMP":
+		if strict {
+			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", s)
+		}
+		c.Type = DATETIME
+		return nil
+	case ",", ")": // Ugly hack
+		// Data type not specified. DO NOT CONSUME A TOKEN.
+		c.Type = BLOB
+		tokens.Return()
+		return nil
+	default:
+		if strict {
+			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", s)
+		}
+		c.Type = BLOB
+		return nil
 	}
-	c.Type = dt
-	tokens.Take()
-	return nil
 }
 
 // parseForeignKey assumes the Next() token is "REFERENCES" and takes over parsing the rest of the parsing.
