@@ -23,60 +23,67 @@ func WherePKs(t *parser.Table) string {
 
 // InsertColumns returns the column list for INSERT or VALUES, depending on the last param.
 func InsertColumns(t *parser.Table, value bool) string {
-	res := ""
+	cols := []string{}
 	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue // skip
+		switch {
+		case col.AutoIncrement():
+			continue // skip this column (e.g. rowid, or ID)
+		case col.SQLName() == "created_at":
+			continue // skip because the DB should generate this // TODO: Or should we specify datetime('now')?
+		case col.SQLName() == "updated_at":
+			continue //  skip because the DB should generate this // TODO: Or should we specify datetime('now')?
+		case col.SQLName() == "deleted_at":
+			continue //  skip because the DB should generate this
+		case value:
+			cols = append(cols, fmt.Sprintf(":% s", col.SQLName()))
+		default:
+			cols = append(cols, col.SQLName())
 		}
-		if res != "" {
-			res += ", "
-		}
-		if value {
-			res += ":"
-		}
-		res += col.SQLName()
 	}
-	return res
+	return strings.Join(cols, ", ")
 }
 
 // UpdateColumns returns the column list for UPDATE or VALUES, depending on the last param.
-// TODO: Update update_at if used!
 func UpdateColumns(t *parser.Table, value bool) string {
-	res := ""
+	cols := []string{}
 	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue // skip
+		switch {
+		case col.AutoIncrement():
+			continue // skip this column (e.g. rowid, or ID)
+		case col.SQLName() == "created_at":
+			continue // skip because Created At should not be updated
+		case col.SQLName() == "updated_at" && value:
+			cols = append(cols, "datetime('now')") // Use SQLite to update this column
+			continue
+		case value:
+			cols = append(cols, fmt.Sprintf(":% s", col.SQLName()))
+		default:
+			cols = append(cols, col.SQLName())
 		}
-		if res != "" {
-			res += ", "
-		}
-		if value {
-			res += ":"
-		}
-		res += col.SQLName()
 	}
-	return res
+	return strings.Join(cols, ", ")
 }
 
 // UpsertUpdateColumns returns the column list for DO UPDATE SET.
-// TODO: Update update_at if used!
 func UpsertUpdateColumns(t *parser.Table) string {
-	res := ""
+	cols := []string{}
 	for _, col := range t.Columns {
-		if col.DBGenerated() {
-			continue // skip
+		switch {
+		case col.AutoIncrement():
+			continue // skip this column (e.g. rowid, or ID)
+		case col.SQLName() == "created_at":
+			continue // skip because Created At should not be updated
+		case col.SQLName() == "updated_at": // Use SQLite to update this column
+			cols = append(cols, fmt.Sprintf("%s=datetime('now')", col.SQLName()))
+			continue
+		default:
+			cols = append(cols, fmt.Sprintf("%s=EXCLUDED.%s", col.SQLName(), col.SQLName()))
 		}
-		if res != "" {
-			res += ", "
-		}
-		res += fmt.Sprintf("%s=EXCLUDED.%s", col.SQLName(), col.SQLName())
 	}
-	return res
+	return strings.Join(cols, ", ")
 }
 
 // UpsertConflictColumns returns the column list for an UPSERT's ON CONFLICT clause.
-//
-// TODO: Exclude auto-increment PKs such as row_id or ID.
 //
 // From the SQLite Docs:
 //

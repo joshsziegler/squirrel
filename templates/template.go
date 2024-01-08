@@ -192,7 +192,6 @@ func Table(writer io.Writer, t *parser.Table) {
 		w.N("	return nil")
 		w.N("}")
 	}
-
 }
 
 // columnToGo converts a Column to its Go-ORM layer.
