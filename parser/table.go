@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/joshsziegler/squirrel/name"
 )
@@ -22,6 +23,16 @@ func (t *Table) SQLName() string { return t.sqlName }
 func (t *Table) SetSQLName(s string) {
 	t.sqlName = s
 	t.goName = name.ToGo(s)
+}
+
+// InternalUse returns true if this table is to be used by SQLite only.
+//
+// From SQLite Docs (https://www.sqlite.org/lang_createtable.html):
+//
+// Table names that begin with "sqlite_" are reserved for internal use. It is an
+// error to attempt to create a table with a name that starts with "sqlite_".
+func (t *Table) InternalUse() bool {
+	return strings.HasPrefix(t.SQLName(), "sqlite_")
 }
 
 // SetPrimaryKeys takes a slice of column name(s) and verifies they exist and sets their metadata accordingly.

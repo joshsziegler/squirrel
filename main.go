@@ -47,6 +47,9 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string) error {
 
 	templates.Header(f, pkgName)
 	for _, table := range tables {
+		if table.InternalUse() {
+			continue // skip this table
+		}
 		templates.Table(f, table)
 	}
 	f.Close()
