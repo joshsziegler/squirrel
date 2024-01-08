@@ -10,6 +10,16 @@ go install github.com/joshsziegler/squirrel@latest # Install this binary
 go install go install mvdan.cc/gofumpt@latest      # Install gofumpt for formatting output
 ```
 
+# Using
+
+```bash
+$ squirrel
+Usage: squirrel schema dest pkg
+- schema: Path to the SQL schema you wish to parse (e.g. schema.sql)
+- dest: Path to write the resulting Go-to-SQL layer to (e.g. db.go)
+- pkg: Package name to use in the resulting Go code (e.g. db)
+```
+
 # Developing
 
 Typically, running `make test` or `make build` after your changes is enough, but the `Makefile` has more.
