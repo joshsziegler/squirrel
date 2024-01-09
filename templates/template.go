@@ -201,6 +201,9 @@ func columnToGo(w *ShortWriter, c *parser.Column) {
 	if c.PrimaryKey {
 		commentParts = append(commentParts, "PK")
 	}
+	if c.CompositePrimaryKey {
+		commentParts = append(commentParts, "Composite PK")
+	}
 	if c.Unique {
 		commentParts = append(commentParts, "Unique")
 	}
