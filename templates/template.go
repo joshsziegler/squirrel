@@ -117,7 +117,12 @@ func Table(writer io.Writer, t *parser.Table) {
 		w.N("	if err != nil {")
 		w.N("		return err")
 		w.N("	}")
-		w.N("	x.ID = id")
+		pks := t.PrimaryKeys()
+		if pks[0].Nullable {
+			w.N("	x.ID = sql.NullInt64{Valid: true, Int64: id}")
+		} else {
+			w.N("	x.ID = id")
+		}
 	}
 	w.N("	x._exists = true")
 	w.N("	return nil")
