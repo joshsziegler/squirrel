@@ -53,6 +53,25 @@ type TX interface {
 	Rollback() error
 }
 
+// Stored represents a struct that can be persisted to a SQL database or similar backend.
+type Stored interface {
+	// Exists in the database.
+	Exists() bool
+	// Deleted from the database.
+	Deleted() bool
+	// Insert this row into the database, returning an error on conflicts.
+	// Use Upsert if a conflict should not result in an error.
+	Insert(context.Context, DB) error
+	// Update this existing row in the database.
+	Update(context.Context, DB) error
+	// Save this row to the database, either using Insert if it exists already, or Update if not.
+	Save(context.Context, DB) error
+	// Upsert this row to the database (insert or update if it conflicts with an existing row).
+	Upsert(context.Context, DB) error
+	// Delete this row from the database.
+	Delete(context.Context, DB) error
+}
+
 var (
 	ErrInsertAlreadyExists		= errors.New("cannot insert because the row already exists")
 	ErrInsertMarkedForDeletion	= errors.New("cannot insert because the row has been deleted")
