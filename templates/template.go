@@ -243,12 +243,12 @@ func columnToGo(w *ShortWriter, c *parser.Column) {
 		commentParts = append(commentParts, fmt.Sprintf("Default: %v", c.DefaultInt.Int64))
 	}
 	if c.Comment != "" {
-		commentParts = append(commentParts, fmt.Sprintf("-- %s", c.Comment))
+		commentParts = append(commentParts, c.Comment)
 	}
 	comment := ""
 	if len(commentParts) > 0 {
 		comment = fmt.Sprintf("// %s", strings.Join(commentParts, ", "))
 	}
 
-	w.F("	%s %s %s\n", c.GoName(), c.Type.ToGo(c.Nullable), comment)
+	w.F("	%s %s `db:\"%s\"` %s\n", c.GoName(), c.Type.ToGo(c.Nullable), c.SQLName(), comment)
 }
