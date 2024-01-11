@@ -75,12 +75,12 @@ func (t *Table) SetPrimaryKeys(colNames []string) error {
 //	decided to merely document the fact that SQLite allows NULLs in most PRIMARY KEY columns.
 func (t *Table) PrimaryKeys() []*Column {
 	pks := []*Column{}
-	for _, col := range t.Columns {
+	for i, col := range t.Columns {
 		if col.PrimaryKey {
 			return []*Column{&col} // TODO: Should we continue to search in case of an error where multiple are defined?
 		}
 		if col.CompositePrimaryKey {
-			pks = append(pks, &col)
+			pks = append(pks, &t.Columns[i])
 		}
 	}
 	return pks
