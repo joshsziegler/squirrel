@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"slices"
 
 	"github.com/joshsziegler/squirrel/parser"
 	"github.com/joshsziegler/squirrel/templates"
@@ -46,22 +44,7 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string, ignoreTables []string
 		return err
 	}
 	defer f.Close()
-
-	templates.Header(f, pkgName)
-	for _, table := range tables {
-		if table.InternalUse() || slices.Contains(ignoreTables, table.SQLName()) {
-			continue // skip this table
-		}
-		templates.Table(f, table)
-	}
-	f.Close()
-
-	// Format the result
-	cmd := exec.Command("gofmt", "-l", "-w", "out")
-	output, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("Error formatting output: %s; %s", err.Error(), output)
-	}
+	templates.Write(f, pkgName, tables, ignoreTables)
 	return nil
 }
 
