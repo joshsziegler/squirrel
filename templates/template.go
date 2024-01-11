@@ -180,6 +180,7 @@ func Table(writer io.Writer, t *parser.Table) {
 
 		// UPSERT
 		w.N("// Upsert this row to the database.")
+		w.N("// Note this does not specify a \"conflict target\": https://www.sqlite.org/lang_upsert.html")
 		w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", t.GoName())
 		w.N("	switch {")
 		w.N("	case x._deleted: // deleted")
@@ -188,8 +189,7 @@ func Table(writer io.Writer, t *parser.Table) {
 		w.N("	_, err := dbc.NamedExecContext(ctx, `")
 		w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
 		w.F("		VALUES (%s)\n", InsertColumns(t, true))
-		w.F("		ON CONFLICT (%s)\n", UpsertConflictColumns(t))
-		w.F("		DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
+		w.F("		ON CONFLICT DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
 		w.N("	if err != nil {")
 		w.N("		return err")
 		w.N("	}")
