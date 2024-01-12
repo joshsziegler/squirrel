@@ -168,7 +168,7 @@ func columnToGo(w *ShortWriter, c *parser.Column) {
 func Insert(w *ShortWriter, t *parser.Table) {
 	w.N("// Insert this row into the database, returning an error on conflicts.")
 	w.N("// Use Upsert if a conflict should not result in an error.")
-	w.F("func (x *%s) Insert(ctx context.Context, dbc DB) error {\n", t.GoName())
+	w.F("func (x *%s) Insert(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N(`	switch {`)
 	w.N(`	case x._exists:`)
 	w.N(`		return ErrInsertAlreadyExists`)
@@ -176,9 +176,9 @@ func Insert(w *ShortWriter, t *parser.Table) {
 	w.N(`		return ErrInsertMarkedForDeletion`)
 	w.N(`	}`)
 	if t.PrimaryKeyAutoIncrements() {
-		w.N("	res, err := dbc.NamedExecContext(ctx, `")
+		w.N("	res, err := db.NamedExecContext(ctx, `")
 	} else {
-		w.N("	_, err := dbc.NamedExecContext(ctx, `")
+		w.N("	_, err := db.NamedExecContext(ctx, `")
 	}
 	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
 	w.F("		VALUES (%s)`, x)\n", InsertColumns(t, true))
@@ -208,7 +208,7 @@ func Update(w *ShortWriter, t *parser.Table) {
 		return
 	}
 	w.N("// Update this row in the database.")
-	w.F("func (x *%s) Update(ctx context.Context, dbc DB) error {\n", t.GoName())
+	w.F("func (x *%s) Update(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N("	switch {")
 	w.N("	case !x._exists: // doesn't exist")
 	w.N("		return ErrUpdateDoesNotExist")
@@ -216,7 +216,7 @@ func Update(w *ShortWriter, t *parser.Table) {
 	w.N("		return ErrUpdateMarkedForDeletion")
 	w.N("	}")
 	w.N("	// update with primary key")
-	w.N("	_, err := dbc.NamedExecContext(ctx, `")
+	w.N("	_, err := db.NamedExecContext(ctx, `")
 	w.F("			UPDATE %s (%s)\n", t.SQLName(), UpdateColumns(t, false))
 	w.F("			VALUES (%s)\n", UpdateColumns(t, true))
 	w.F("			WHERE %s`, x)\n", WherePKs(t))
@@ -233,11 +233,11 @@ func Save(w *ShortWriter, t *parser.Table) {
 		return
 	}
 	w.N("// Save this row to the database, either using Insert or Update.")
-	w.F("func (x *%s) Save(ctx context.Context, dbc DB) error {\n", t.GoName())
+	w.F("func (x *%s) Save(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N("	if x.Exists() {")
-	w.N("		return x.Update(ctx, dbc)")
+	w.N("		return x.Update(ctx, db)")
 	w.N("	}")
-	w.N("	return x.Insert(ctx, dbc)")
+	w.N("	return x.Insert(ctx, db)")
 	w.N("}\n\n")
 }
 
@@ -248,12 +248,12 @@ func Upsert(w *ShortWriter, t *parser.Table) {
 	}
 	w.N("// Upsert this row to the database.")
 	w.N("// Note this does not specify a \"conflict target\": https://www.sqlite.org/lang_upsert.html")
-	w.F("func (x *%s) Upsert(ctx context.Context, dbc DB) error {\n", t.GoName())
+	w.F("func (x *%s) Upsert(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N("	switch {")
 	w.N("	case x._deleted: // deleted")
 	w.N("		return ErrUpsertMarkedForDeletion")
 	w.N("	}")
-	w.N("	_, err := dbc.NamedExecContext(ctx, `")
+	w.N("	_, err := db.NamedExecContext(ctx, `")
 	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
 	w.F("		VALUES (%s)\n", InsertColumns(t, true))
 	w.F("		ON CONFLICT DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
@@ -272,14 +272,14 @@ func Delete(w *ShortWriter, t *parser.Table) {
 		return
 	}
 	w.N("// Delete this row from the database.")
-	w.F("func (x *%s) Delete(ctx context.Context, dbc DB) error {\n", t.GoName())
+	w.F("func (x *%s) Delete(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N("	switch {")
 	w.N("	case !x._exists: // doesn't exist")
 	w.N("		return nil")
 	w.N("	case x._deleted:")
 	w.N("		return nil")
 	w.N("	}")
-	w.N("	_, err := dbc.NamedExecContext(ctx, `")
+	w.N("	_, err := db.NamedExecContext(ctx, `")
 	w.F("			DELETE FROM %s\n", t.SQLName())
 	w.F("			WHERE %s`, x)\n", WherePKs(t))
 	w.N("	if err != nil {")
@@ -296,16 +296,49 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 	if len(pk) < 1 {
 		return
 	}
+	// Concatenate each PK (if this uses a composite key) to create the name (e.g. GetByArtistAlbum).
+	pkNames := make([]string, len(pk))
+	// Create the arguments for this function (e.g. Artist string, Album string).
+	pkArgs := make([]string, len(pk))
+	pkWhere := make([]string, len(pk))
+	for i := range pk {
+		pkNames[i] = pk[i].GoName()
+		pkArgs[i] = fmt.Sprintf("%s %s", pk[i].GoName(), pk[i].GetGoType())
+		pkWhere[i] = fmt.Sprintf("%s=?", pk[i].SQLName())
+	}
+	funcName := fmt.Sprintf("%sGetBy%s", t.GoName(), strings.Join(pkNames, ""))
+	w.F("// %s\n", funcName)
+	w.F("func %s(ctx context.Context, db DB, %s) (*%s, error) {\n", funcName, strings.Join(pkArgs, ", "), t.GoName())
+	w.F("	row := &%s{}\n", t.GoName())
+	w.F("	err := db.Select(&row, `\n")
+	w.N("		SELECT *")
+	w.F("		FROM %s\n", t.SQLName())
+	w.F("		WHERE %s`, %s)\n", strings.Join(pkWhere, ", "), strings.Join(pkNames, ", "))
+	w.N("	if err != nil {")
+	w.N("		return nil, err")
+	w.N("	}")
+	w.N("	row._exists = true")
+	w.N("	return row, nil")
+	w.N("}\n\n")
+}
+
+// GetAll
+func GetAll(w *ShortWriter, t *parser.Table) {
+	pk := t.PrimaryKeys()
+	if len(pk) < 1 {
+		return
+	}
 	pkName := ""
 	for i := range pk {
 		pkName = pkName + pk[i].GoName()
 	}
-	w.F("// GetBy%s\n", pkName)
-	w.F("func (x *%s) GetBy%s(ctx context.Context, dbc DB) error {\n", t.GoName(), pkName)
+	funcName := fmt.Sprintf("%sGetAll", t.GoName())
+	w.F("// %s\n", funcName)
+	w.F("func %s(ctx context.Context, db DB) ([]*%s, error) {\n", funcName, t.GoName())
 	w.F("	all := []*%s{}\n", t.GoName())
-	w.F("	err := dbc.Select(&all, `\n")
+	w.F("	err := db.Select(&all, `\n")
 	w.N("		SELECT *")
-	w.F("		FROM %s`)\n", t.GoName())
+	w.F("		FROM %s`)\n", t.SQLName())
 	w.N("	if err != nil {")
 	w.N("		return nil, err")
 	w.N("	}")

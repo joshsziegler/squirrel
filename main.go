@@ -8,6 +8,11 @@ import (
 	"github.com/joshsziegler/squirrel/templates"
 )
 
+var (
+	BuildDate    = "Unknown"
+	BuildVersion = "Unknown"
+)
+
 // readFile from disk and return its content as a string.
 func readFile(path string) (string, error) {
 	fileBytes, err := os.ReadFile(path)
@@ -51,10 +56,14 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string, ignoreTables []string
 func main() {
 	if len(os.Args) < 4 {
 		fmt.Printf("Usage: %s schema dest pkg [ignored_tables]\n", os.Args[0])
+		fmt.Println("")
 		fmt.Println("- schema: Path to the SQL schema you wish to parse (e.g. schema.sql)")
 		fmt.Println("- dest: Path to write the resulting Go-to-SQL layer to (e.g. db.go)")
 		fmt.Println("- pkg: Package name to use in the resulting Go code (e.g. db)")
 		fmt.Println("- ignored_tables: Optional list of tables to ignore with spaces between each table (e.g. goose users).")
+		fmt.Println("")
+		fmt.Printf("Version: %s\n", BuildVersion)
+		fmt.Printf("Built On: %s\n", BuildDate)
 		return
 	}
 	schema := os.Args[1]

@@ -1,10 +1,16 @@
 .PHONY: build install test format dependencies pre-commit
 
 build:
-	go build .
+	go build -ldflags \
+		"-X main.BuildVersion=${shell git describe --tags} \
+		 -X main.BuildDate=${shell date -u +%Y.%m.%d}" \
+		.
 
 install:
-	go install .
+	go install -ldflags \
+		"-X main.BuildVersion=${shell git describe --tags} \
+		 -X main.BuildDate=${shell date -u +%Y.%m.%d}" \
+		.
 
 test:
 	go test ./...

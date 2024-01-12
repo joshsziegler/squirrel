@@ -32,6 +32,11 @@ func (t *Column) SetSQLName(s string) {
 	t.goName = name.ToGo(s)
 }
 
+// GetGoType returns this column's Go equivalent.
+func (t *Column) GetGoType() string {
+	return t.Type.ToGo(t.Nullable)
+}
+
 // DBGenerated returns true if the database creates this column, such as row IDs, or
 // created/updates_at metadata.
 func (c *Column) DBGenerated() bool {
