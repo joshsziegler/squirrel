@@ -4,14 +4,22 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/joshsziegler/squirrel/parser"
 )
 
+// Write the SQL-Go access layer to f, using pkgName, except for the tables in ignoredTables.
+// Table sorted alphabetically (A to Z), so the resulting code will not change due to input orger.
+// Otherwise, the resulting git diffs can be noisy.
 func Write(f io.Writer, pkgName string, tables []*parser.Table, ignoreTables []string) {
+	// Sort the tables alphabetically (A to Z)
+	sort.Slice(tables, func(i, j int) bool {
+		return tables[i].GoName() < tables[j].GoName()
+	})
+	// Write to f
 	w := NewShortWriter(f)
-
 	Header(w, pkgName)
 	for _, table := range tables {
 		if table.InternalUse() || slices.Contains(ignoreTables, table.SQLName()) {

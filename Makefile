@@ -16,6 +16,7 @@ test:
 	go test ./...
 
 format:
+	go mod tidy
 	gofumpt -w -l .
 
 # Install all development dependencies
