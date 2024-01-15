@@ -505,13 +505,31 @@ func TestParse(t *testing.T) {
 		},
 		{
 			"bug: unrecognized table constraint due to two 'ON' clauses",
-			`CREATE TABLE ip_login_attempts (
+			`CREATE TABLE ip_login_summary (
+				ip                 TEXT PRIMARY KEY,
+				total_attempts     INTEGER DEFAULT 0,
+				locked             BOOLEAN DEFAULT 0,
+				lockout_time       DATETIME DEFAULT NULL,
+				last_attempt_time  DATETIME DEFAULT NULL
+			);
+			CREATE TABLE ip_login_attempts (
 				id   INTEGER PRIMARY KEY AUTOINCREMENT,
 				ip   TEXT NOT NULL REFERENCES ip_login_summary (ip) ON UPDATE CASCADE ON DELETE CASCADE,
 				time DATETIME NOT NULL DEFAULT (datetime('now'))
 			);`,
 			false,
 			[]*Table{
+				{
+					sqlName: "ip_login_summary",
+					goName:  "IPLoginSummary",
+					Columns: []Column{
+						{sqlName: "ip", goName: "IP", Type: TEXT, PrimaryKey: true, Nullable: true},
+						{sqlName: "total_attempts", goName: "TotalAttempt", Type: INT, Nullable: true, DefaultInt: sql.NullInt64{Valid: true, Int64: 0}},
+						{sqlName: "locked", goName: "Locked", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+						{sqlName: "lockout_time", goName: "LockoutTime", Type: DATETIME, Nullable: true},
+						{sqlName: "last_attempt_time", goName: "LastAttemptTime", Type: DATETIME, Nullable: true},
+					},
+				},
 				{
 					sqlName: "ip_login_attempts",
 					goName:  "IPLoginAttempt",

@@ -279,7 +279,7 @@ func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 				return c, fmt.Errorf("default values for %s type are not supported", c.Type)
 			}
 		} else {
-			return c, fmt.Errorf("unrecognized column constraint starting with: %s", tokens.NextN(5))
+			return c, fmt.Errorf("unrecognized column constraint for column \"%s\" starting with: \"%s\"", c.SQLName(), tokens.NextN(5))
 		}
 	}
 
@@ -428,10 +428,14 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 }
 
 func parseDatetimeDefault(tokens *Tokens) {
+	t := tokens.Take()
+	if t == "NULL" {
+		log.Debug("[IGNORED] DateTime Default: NULL")
+		return
+	}
 	value := []string{}
 	paren := 0
 	for {
-		t := tokens.Take()
 		if t == "(" {
 			paren += 1
 		} else if t == ")" {
@@ -443,6 +447,7 @@ func parseDatetimeDefault(tokens *Tokens) {
 			// ignore
 			value = append(value, t)
 		}
+		t = tokens.Take()
 	}
 	log.Debugf("[IGNORED] DateTime Default: %s\n", strings.Join(value, " "))
 }
