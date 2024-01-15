@@ -4,13 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/carlmjohnson/versioninfo"
+
 	"github.com/joshsziegler/squirrel/parser"
 	"github.com/joshsziegler/squirrel/templates"
-)
-
-var (
-	BuildDate    = "Unknown"
-	BuildVersion = "Unknown"
 )
 
 // readFile from disk and return its content as a string.
@@ -62,8 +59,12 @@ func main() {
 		fmt.Println("- pkg: Package name to use in the resulting Go code (e.g. db)")
 		fmt.Println("- ignored_tables: Optional list of tables to ignore with spaces between each table (e.g. goose users).")
 		fmt.Println("")
-		fmt.Printf("Version: %s\n", BuildVersion)
-		fmt.Printf("Built On: %s\n", BuildDate)
+		fmt.Printf("Version: %s\n", versioninfo.Version)
+		fmt.Printf("Revision: %s\n", versioninfo.Revision)
+		if versioninfo.DirtyBuild { // Don't print this for tagged/released versions
+			fmt.Printf("Dirty: %v\n", versioninfo.DirtyBuild)
+		}
+		fmt.Printf("Built On: %s\n", versioninfo.LastCommit)
 		return
 	}
 	schema := os.Args[1]

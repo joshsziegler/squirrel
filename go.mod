@@ -3,6 +3,7 @@ module github.com/joshsziegler/squirrel
 go 1.21.4
 
 require (
+	github.com/carlmjohnson/versioninfo v0.22.5
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/joshsziegler/zgo v0.11.0
 	github.com/stretchr/testify v1.8.4

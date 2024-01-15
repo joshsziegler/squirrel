@@ -1,16 +1,10 @@
 .PHONY: build
 build:
-	go build -ldflags \
-		"-X main.BuildVersion=${shell git describe --tags} \
-		 -X main.BuildDate=${shell date -u +%Y.%m.%d}" \
-		.
+	go build .
 
 .PHONY: install
 install:
-	go install -ldflags \
-		"-X main.BuildVersion=${shell git describe --tags} \
-		 -X main.BuildDate=${shell date -u +%Y.%m.%d}" \
-		.
+	go install .
 
 .PHONY: test
 test:
