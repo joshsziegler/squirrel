@@ -482,6 +482,47 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"bug: unrecognized table constraint due to two 'ON' clauses",
+			`CREATE TABLE ip_login_attempts (
+				id   INTEGER PRIMARY KEY AUTOINCREMENT,
+				ip   TEXT NOT NULL,
+				time DATETIME NOT NULL DEFAULT (datetime('now')),
+				FOREIGN KEY (ip) REFERENCES ip_login_summary (ip) ON UPDATE CASCADE ON DELETE CASCADE
+			);`,
+			false,
+			[]*Table{
+				{
+					sqlName: "ip_login_attempts",
+					goName:  "IPLoginAttempt",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
+						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false},
+						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
+					},
+				},
+			},
+		},
+		{
+			"bug: unrecognized table constraint due to two 'ON' clauses",
+			`CREATE TABLE ip_login_attempts (
+				id   INTEGER PRIMARY KEY AUTOINCREMENT,
+				ip   TEXT NOT NULL REFERENCES ip_login_summary (ip) ON UPDATE CASCADE ON DELETE CASCADE,
+				time DATETIME NOT NULL DEFAULT (datetime('now'))
+			);`,
+			false,
+			[]*Table{
+				{
+					sqlName: "ip_login_attempts",
+					goName:  "IPLoginAttempt",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
+						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "ip_login_summary", Column: "ip", OnUpdate: Cascade, OnDelete: Cascade}},
+						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

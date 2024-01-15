@@ -386,9 +386,15 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
 	}
 	// cols[0] // TO COLUMN
-	err := parseFkAction(tokens, fk)
-	if err != nil {
-		return nil, err
+	// ON UPDATE/ON DELETE (can have multiple)
+	for {
+		if tokens.Next() != "ON" {
+			break
+		}
+		err := parseFkAction(tokens, fk)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return fk, nil
 }
