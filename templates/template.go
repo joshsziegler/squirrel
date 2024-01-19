@@ -345,7 +345,7 @@ func GetAll(w *ShortWriter, t *parser.Table) {
 	w.F("// %s\n", funcName)
 	w.F("func %s(ctx context.Context, db DB) ([]*%s, error) {\n", funcName, t.GoName())
 	w.F("	all := []*%s{}\n", t.GoName())
-	w.F("	err := db.SelectContext(&all, `\n")
+	w.F("	err := db.SelectContext(ctx, &all, `\n")
 	w.N("		SELECT *")
 	w.F("		FROM %s`)\n", t.SQLName())
 	w.N("	if err != nil {")
