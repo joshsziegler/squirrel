@@ -135,6 +135,7 @@ func Table(w *ShortWriter, t *parser.Table) {
 	Upsert(w, t)
 	Delete(w, t)
 	GetByPk(w, t)
+	GetAll(w, t)
 }
 
 // columnToGo converts a Column to its Go-ORM layer.
@@ -318,7 +319,7 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 	w.F("// %s\n", funcName)
 	w.F("func %s(ctx context.Context, db DB, %s) (*%s, error) {\n", funcName, strings.Join(pkArgs, ", "), t.GoName())
 	w.F("	row := &%s{}\n", t.GoName())
-	w.F("	err := db.Select(&row, `\n")
+	w.F("	err := db.SelectContext(ctx, &row, `\n")
 	w.N("		SELECT *")
 	w.F("		FROM %s\n", t.SQLName())
 	w.F("		WHERE %s`, %s)\n", strings.Join(pkWhere, ", "), strings.Join(pkNames, ", "))
@@ -344,7 +345,7 @@ func GetAll(w *ShortWriter, t *parser.Table) {
 	w.F("// %s\n", funcName)
 	w.F("func %s(ctx context.Context, db DB) ([]*%s, error) {\n", funcName, t.GoName())
 	w.F("	all := []*%s{}\n", t.GoName())
-	w.F("	err := db.Select(&all, `\n")
+	w.F("	err := db.SelectContext(&all, `\n")
 	w.N("		SELECT *")
 	w.F("		FROM %s`)\n", t.SQLName())
 	w.N("	if err != nil {")
