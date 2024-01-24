@@ -322,7 +322,7 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 	funcName := fmt.Sprintf("%sGetBy%s", t.GoName(), strings.Join(pkNames, ""))
 	w.F("// %s\n", funcName)
 	w.F("func %s(ctx context.Context, db DB, %s) (*%s, error) {\n", funcName, strings.Join(pkArgs, ", "), t.GoName())
-	w.F("	row := &%s{}\n", t.GoName())
+	w.F("	row := %s{}\n", t.GoName())
 	w.F("	err := db.GetContext(ctx, &row, `\n")
 	w.N("		SELECT *")
 	w.F("		FROM %s\n", t.SQLName())
@@ -331,7 +331,7 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 	w.N("		return nil, err")
 	w.N("	}")
 	w.N("	row._exists = true")
-	w.N("	return row, nil")
+	w.N("	return &row, nil")
 	w.N("}\n\n")
 }
 
