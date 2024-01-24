@@ -43,8 +43,8 @@ func InsertColumns(t *parser.Table, value bool) string {
 	return strings.Join(cols, ", ")
 }
 
-// UpdateColumns returns the column list for UPDATE or VALUES, depending on the last param.
-func UpdateColumns(t *parser.Table, value bool) string {
+// UpdateColumns returns the column list for UPDATE clauses (e.g. name=:name, updated_at=datetime('now')).
+func UpdateColumns(t *parser.Table) string {
 	cols := []string{}
 	for _, col := range t.Columns {
 		switch {
@@ -52,13 +52,11 @@ func UpdateColumns(t *parser.Table, value bool) string {
 			continue // skip this column (e.g. rowid, or ID)
 		case col.SQLName() == "created_at":
 			continue // skip because Created At should not be updated
-		case col.SQLName() == "updated_at" && value:
-			cols = append(cols, "datetime('now')") // Use SQLite to update this column
+		case col.SQLName() == "updated_at":
+			cols = append(cols, "updated_at=datetime('now')") // Use SQLite to update this column
 			continue
-		case value:
-			cols = append(cols, fmt.Sprintf(":% s", col.SQLName()))
 		default:
-			cols = append(cols, col.SQLName())
+			cols = append(cols, fmt.Sprintf("%s=:% s", col.SQLName(), col.SQLName()))
 		}
 	}
 	return strings.Join(cols, ", ")

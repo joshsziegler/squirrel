@@ -38,6 +38,8 @@ import (
 	"database/sql"
 	"errors"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 `)
 	w.N(`
@@ -54,6 +56,8 @@ type DB interface {
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
 	Prepare(query string) (*sql.Stmt, error)
 	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
+	PrepareNamed(query string) (*sqlx.NamedStmt, error)
+	PrepareNamedContext(ctx context.Context, query string) (*sqlx.NamedStmt, error)
 	Query(query string, args ...any) (*sql.Rows, error)
 	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
 	QueryRow(query string, args ...any) *sql.Row
@@ -175,7 +179,8 @@ func columnToGo(w *ShortWriter, c *parser.Column) {
 
 // Insert
 func Insert(w *ShortWriter, t *parser.Table) {
-	w.N("// Insert this row into the database, returning an error on conflicts.")
+	w.N("// Insert this row into the database and update this struct with DB-generated values.")
+	w.N("// Return an error on conflicts.")
 	w.N("// Use Upsert if a conflict should not result in an error.")
 	w.F("func (x *%s) Insert(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N(`	switch {`)
@@ -184,28 +189,17 @@ func Insert(w *ShortWriter, t *parser.Table) {
 	w.N(`	case x._deleted:`)
 	w.N(`		return ErrInsertMarkedForDeletion`)
 	w.N(`	}`)
-	if t.PrimaryKeyAutoIncrements() {
-		w.N("	res, err := db.NamedExecContext(ctx, `")
-	} else {
-		w.N("	_, err := db.NamedExecContext(ctx, `")
-	}
+	w.N("	stmt, err := db.PrepareNamed(`")
 	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
-	w.F("		VALUES (%s)`, x)\n", InsertColumns(t, true))
+	w.F("		VALUES (%s)\n", InsertColumns(t, true))
+	w.N("		RETURNING *`)")
 	w.N("	if err != nil {")
 	w.N("		return err")
 	w.N("	}")
-	if t.PrimaryKeyAutoIncrements() {
-		w.N("	id, err := res.LastInsertId()")
-		w.N("	if err != nil {")
-		w.N("		return err")
-		w.N("	}")
-		pks := t.PrimaryKeys()
-		if pks[0].Nullable {
-			w.N("	x.ID = sql.NullInt64{Valid: true, Int64: id}")
-		} else {
-			w.N("	x.ID = id")
-		}
-	}
+	w.N("	err = stmt.GetContext(ctx, x, x)")
+	w.N("	if err != nil {")
+	w.N("		return err")
+	w.N("	}")
 	w.N("	x._exists = true")
 	w.N("	return nil")
 	w.N("}\n\n")
@@ -216,7 +210,7 @@ func Update(w *ShortWriter, t *parser.Table) {
 	if len(t.PrimaryKeys()) < 1 {
 		return
 	}
-	w.N("// Update this row in the database.")
+	w.N("// Update this row in the database and update this struct with DB-generated values.")
 	w.F("func (x *%s) Update(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N("	switch {")
 	w.N("	case !x._exists: // doesn't exist")
@@ -225,10 +219,15 @@ func Update(w *ShortWriter, t *parser.Table) {
 	w.N("		return ErrUpdateMarkedForDeletion")
 	w.N("	}")
 	w.N("	// update with primary key")
-	w.N("	_, err := db.NamedExecContext(ctx, `")
-	w.F("			UPDATE %s (%s)\n", t.SQLName(), UpdateColumns(t, false))
-	w.F("			VALUES (%s)\n", UpdateColumns(t, true))
-	w.F("			WHERE %s`, x)\n", WherePKs(t))
+	w.N("	stmt, err := db.PrepareNamed(`")
+	w.F("			UPDATE %s\n", t.SQLName())
+	w.F("			SET %s\n", UpdateColumns(t))
+	w.F("			WHERE %s\n", WherePKs(t))
+	w.N("			RETURNING *`)")
+	w.N("	if err != nil {")
+	w.N("		return err")
+	w.N("	}")
+	w.N("	err = stmt.GetContext(ctx, x, x)")
 	w.N("	if err != nil {")
 	w.N("		return err")
 	w.N("	}")
@@ -255,17 +254,22 @@ func Upsert(w *ShortWriter, t *parser.Table) {
 	if len(t.PrimaryKeys()) < 1 {
 		return
 	}
-	w.N("// Upsert this row to the database.")
+	w.N("// Upsert this row to the database and update this struct with DB-generatd values.")
 	w.N("// Note this does not specify a \"conflict target\": https://www.sqlite.org/lang_upsert.html")
 	w.F("func (x *%s) Upsert(ctx context.Context, db DB) error {\n", t.GoName())
 	w.N("	switch {")
 	w.N("	case x._deleted: // deleted")
 	w.N("		return ErrUpsertMarkedForDeletion")
 	w.N("	}")
-	w.N("	_, err := db.NamedExecContext(ctx, `")
+	w.N("	stmt, err := db.PrepareNamed(`")
 	w.F("		INSERT INTO %s (%s)\n", t.SQLName(), InsertColumns(t, false))
 	w.F("		VALUES (%s)\n", InsertColumns(t, true))
-	w.F("		ON CONFLICT DO UPDATE SET %s`, x)\n", UpsertUpdateColumns(t))
+	w.F("		ON CONFLICT DO UPDATE SET %s\n", UpsertUpdateColumns(t))
+	w.N("		RETURNING *`)")
+	w.N("	if err != nil {")
+	w.N("		return err")
+	w.N("	}")
+	w.N("	err = stmt.GetContext(ctx, x, x)")
 	w.N("	if err != nil {")
 	w.N("		return err")
 	w.N("	}")
