@@ -326,7 +326,7 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 	w.F("	err := db.GetContext(ctx, &row, `\n")
 	w.N("		SELECT *")
 	w.F("		FROM %s\n", t.SQLName())
-	w.F("		WHERE %s`, %s)\n", strings.Join(pkWhere, ", "), strings.Join(pkNames, ", "))
+	w.F("		WHERE %s`, %s)\n", strings.Join(pkWhere, " AND "), strings.Join(pkNames, ", "))
 	w.N("	if err != nil {")
 	w.N("		return nil, err")
 	w.N("	}")
