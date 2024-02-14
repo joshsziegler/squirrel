@@ -140,6 +140,7 @@ func Table(w *ShortWriter, t *parser.Table) {
 	Upsert(w, t)
 	Delete(w, t)
 	GetByPk(w, t)
+	GetByUnique(w, t)
 	GetAll(w, t)
 }
 
@@ -321,7 +322,7 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 		pkWhere[i] = fmt.Sprintf("%s=?", pk[i].SQLName())
 	}
 	funcName := fmt.Sprintf("%sGetBy%s", t.GoName(), strings.Join(pkNames, ""))
-	w.F("// %s\n", funcName)
+	w.F("// %s (Primary Key)\n", funcName)
 	w.F("func %s(ctx context.Context, db DB, %s) (*%s, error) {\n", funcName, strings.Join(pkArgs, ", "), t.GoName())
 	w.F("	row := %s{}\n", t.GoName())
 	w.F("	err := db.GetContext(ctx, &row, `\n")
@@ -334,6 +335,29 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 	w.N("	row._exists = true")
 	w.N("	return &row, nil")
 	w.N("}\n\n")
+}
+
+// GetByUnique
+func GetByUnique(w *ShortWriter, t *parser.Table) {
+	for _, col := range t.Columns {
+		if !col.Unique {
+			continue
+		}
+		funcName := fmt.Sprintf("%sGetBy%s", t.GoName(), col.GoName())
+		w.F("// %s (Unique Column)\n", funcName)
+		w.F("func %s(ctx context.Context, db DB, %s %s) (*%s, error) {\n", funcName, col.GoName(), col.GetGoType(), t.GoName())
+		w.F("	row := %s{}\n", t.GoName())
+		w.F("	err := db.GetContext(ctx, &row, `\n")
+		w.N("		SELECT *")
+		w.F("		FROM %s\n", t.SQLName())
+		w.F("		WHERE %s=?`, %s)\n", col.SQLName(), col.GoName())
+		w.N("	if err != nil {")
+		w.N("		return nil, err")
+		w.N("	}")
+		w.N("	row._exists = true")
+		w.N("	return &row, nil")
+		w.N("}\n\n")
+	}
 }
 
 // GetAll
