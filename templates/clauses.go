@@ -14,7 +14,7 @@ func WherePKs(t *parser.Table) string {
 	pks := t.PrimaryKeys()
 	for i, col := range pks {
 		if i > 0 {
-			res += ", "
+			res += " AND "
 		}
 		res += fmt.Sprintf("%s=:%s", col.SQLName(), col.SQLName())
 	}
