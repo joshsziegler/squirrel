@@ -20,6 +20,8 @@ var (
 		"url": "URL",
 		"ip":  "IP",
 		"pid": "PID",
+		"uid": "UID",
+		"gid": "GID",
 	}
 )
 
