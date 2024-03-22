@@ -338,9 +338,17 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 }
 
 // GetByUnique
+//
+// SQLite allows unique columns to be nullable, but querying NULL is always
+// unique, meaning querying for NULL would return _multiple_ rows. Because this
+// is an ambigious situation, we do not gererate a getter for columns that are
+// both unique, and nullable.
 func GetByUnique(w *ShortWriter, t *parser.Table) {
 	for _, col := range t.Columns {
-		if !col.Unique {
+		switch {
+		case !col.Unique:
+			continue
+		case col.Nullable:
 			continue
 		}
 		funcName := fmt.Sprintf("%sGetBy%s", t.GoName(), col.GoName())
