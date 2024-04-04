@@ -22,6 +22,7 @@ var (
 		"pid": "PID",
 		"uid": "UID",
 		"gid": "GID",
+		"os":  "OS",
 	}
 )
 
