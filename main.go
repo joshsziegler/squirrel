@@ -77,5 +77,6 @@ func main() {
 	err := GenerateGoFromSQL(schema, output, pkgName, ignoredTables)
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1) // Return an error code so the caller knows we failed.
 	}
 }
