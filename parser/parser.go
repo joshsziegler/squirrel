@@ -20,7 +20,6 @@ func Parse(sql string) ([]*Table, error) {
 			tokens.Take()
 		case tokens.Next() == "": // End of SQL
 			return tables, nil
-
 		case tokens.NextN(2) == "CREATE TABLE": // FIXME: This won't catch TEMPORARY or TEMP
 			table, err := parseCreateTable(tokens)
 			if err != nil {
@@ -28,7 +27,9 @@ func Parse(sql string) ([]*Table, error) {
 				return nil, err
 			}
 			tables = append(tables, table)
-		case tokens.NextN(2) == "CREATE INDEX": // FIXME: This won't catch UNIQUE indices
+		case tokens.NextN(2) == "CREATE INDEX":
+			fallthrough
+		case tokens.NextN(3) == "CREATE UNIQUE INDEX":
 			// https://www.sqlite.org/syntax/create-index-stmt.html
 			err := parseCreateIndex(tokens)
 			if err != nil {
@@ -543,6 +544,12 @@ func parseCreateIndex(tokens *Tokens) error {
 		return fmt.Errorf("create index must be followed by one or more columns, not \"%s\"", tokens.NextN(3))
 	}
 	// TODO: Handle WHERE expr
+	if tokens.Next() == "WHERE" {
+		tokens.Take()
+		if err := parseExpression(tokens); err != nil {
+			return fmt.Errorf("create index contained invalid WHERE expression: %s", err)
+		}
+	}
 	if tokens.Next() == ";" { // Optional(?) closing semicolon
 		tokens.Take()
 	}
@@ -575,6 +582,87 @@ func parseCheckConstraint(tokens *Tokens) {
 	log.Debugf("[IGNORED] CHECK constraint: %s", strings.Join(value, " "))
 }
 
-func parseExpression(tokens *Tokens) {
-	// TODO
+// parseExpressions: expr
+// See https://www.sqlite.org/syntaxdiagrams.html#expr
+// FIXME: This is getting into complex syntax that really should be using a proper lexer/parser to
+// get an AST.
+func parseExpression(tokens *Tokens) error {
+	value := []string{}
+
+	name, err := parseName(tokens)
+	if err != nil {
+		return fmt.Errorf("expression expected [column-name]: %s", err)
+	}
+	value = append(value, name)
+
+	operator, err := parseBinaryOperator(tokens)
+	if err != nil {
+		return fmt.Errorf("expression expected [binary-operator]: %s", err)
+	}
+	value = append(value, operator)
+
+	literal, err := parseLiteral(tokens)
+	if err != nil {
+		return fmt.Errorf("expression expected [literal-value]: %s", err)
+	}
+	value = append(value, literal)
+
+	log.Debugf("[IGNORED] expression: %s", strings.Join(value, " "))
+	return nil
+}
+
+// parseLiteral returns the literal if valid, or an error.
+// https://www.sqlite.org/syntaxdiagrams.html#literal-value
+func parseLiteral(tokens *Tokens) (string, error) {
+	token := tokens.Next()
+	switch token {
+	case "NULL":
+		fallthrough
+	case "TRUE", "FALSE":
+		fallthrough
+	case "CURRENT_TIME", "CURRENT_DATE", "CURRENT_TIMESTAMP":
+		return tokens.Take(), nil
+	}
+	// Is it an integer?
+	if _, err := strconv.Atoi(token); err != nil {
+		tokens.Take()
+		return token, nil
+	}
+	// Is it a decimal value?
+	if _, err := strconv.ParseFloat(token, 64); err != nil {
+		tokens.Take()
+		return token, nil
+	}
+	// TODO: Is it a blob literal? What _is_ a blobl-literal?
+	return "", fmt.Errorf("not a valid literal-value: %s", tokens.Next())
+}
+
+func parseBinaryOperator(tokens *Tokens) (string, error) {
+	token := tokens.Next()
+	switch token {
+	case ">":
+	case "<":
+	case "<=":
+	case ">=":
+	case "=":
+	case "==":
+	case "<>":
+	case "!=":
+	case "IS":
+		// TODO: Test for IS, IS NOT, IS DISTINC FROM, IS NOT DISTINCT FROM,
+	// case "BETWEEN": // Not a binary op
+	// case "AND": // Not a binary op
+	case "IN":
+	case "MATCH":
+	case "LIKE":
+	case "REGEXP":
+	case "GLOB":
+	case "ISNULL":
+	case "NOTNULL":
+	case "NOT":
+		// TODO: Test for NOT NULL
+	default:
+		return "", fmt.Errorf("not a binary operator: %s", token)
+	}
+	return tokens.Take(), nil
 }

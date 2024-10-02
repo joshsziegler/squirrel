@@ -541,6 +541,34 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"BUG: Parser fails on 'CREATE UNIQUE INDEX'",
+			`CREATE TABLE accounts (
+				id				   INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+				name			   TEXT NOT NULL,
+				type			   INTEGER NOT NULL,
+				total			   INTEGER NOT NULL DEFAULT 0,
+				total_used		   INTEGER NOT NULL DEFAULT 0,
+				deactivated        BOOLEAN NOT NULL DEFAULT FALSE
+			);
+			CREATE UNIQUE INDEX idx_account_name_unique_active ON account (name) WHERE deactivated = FALSE;
+			`,
+			false,
+			[]*Table{
+				{
+					sqlName: "accounts",
+					goName:  "Account",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "type", goName: "Type", Type: INT, PrimaryKey: false, Nullable: false},
+						{sqlName: "total", goName: "Total", Type: INT, PrimaryKey: false, Nullable: false, DefaultInt: sql.NullInt64{Valid: true, Int64: 0}},
+						{sqlName: "total_used", goName: "TotalUsed", Type: INT, PrimaryKey: false, Nullable: false, DefaultInt: sql.NullInt64{Valid: true, Int64: 0}},
+						{sqlName: "deactivated", goName: "Deactivated", Type: BOOL, PrimaryKey: false, Nullable: false, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
