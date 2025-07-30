@@ -34,7 +34,7 @@ func ParseFile(path string) ([]*parser.Table, error) {
 
 // GenerateGoFromSQL by reading the schema file from disk, parsing it, and then writing it to goPath.
 // Any table in ignoreTables will be parsed, but not included in the generated Go.
-func GenerateGoFromSQL(schemaPath, goPath, pkgName string, ignoreTables []string) error {
+func GenerateGoFromSQL(schemaPath, goPath, pkgName string, ignoreTables []string, ctxOnly bool) error {
 	tables, err := ParseFile(schemaPath)
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string, ignoreTables []string
 		return err
 	}
 	defer f.Close()
-	templates.Write(f, pkgName, tables, ignoreTables)
+	templates.Write(f, pkgName, tables, ignoreTables, ctxOnly)
 	return nil
 }
 
@@ -70,11 +70,12 @@ func main() {
 	schema := os.Args[1]
 	output := os.Args[2]
 	pkgName := os.Args[3]
+	ctxOnly := true // Only provide context-aware versions of DB methods in interface
 	ignoredTables := []string{}
 	for i := 4; i < len(os.Args); i++ {
 		ignoredTables = append(ignoredTables, os.Args[i])
 	}
-	err := GenerateGoFromSQL(schema, output, pkgName, ignoredTables)
+	err := GenerateGoFromSQL(schema, output, pkgName, ignoredTables, ctxOnly)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1) // Return an error code so the caller knows we failed.
