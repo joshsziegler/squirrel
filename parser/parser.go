@@ -20,16 +20,16 @@ func Parse(sql string) ([]*Table, error) {
 			tokens.Take()
 		case tokens.Next() == "": // End of SQL
 			return tables, nil
-		case tokens.NextN(2) == "CREATE TABLE": // FIXME: This won't catch TEMPORARY or TEMP
+		case tokens.KeywordSeq("CREATE", "TABLE"):
 			table, err := parseCreateTable(tokens)
 			if err != nil {
 				printContext(tokens, err)
 				return nil, err
 			}
 			tables = append(tables, table)
-		case tokens.NextN(2) == "CREATE INDEX":
+		case tokens.KeywordSeq("CREATE", "INDEX"):
 			fallthrough
-		case tokens.NextN(3) == "CREATE UNIQUE INDEX":
+		case tokens.KeywordSeq("CREATE", "UNIQUE", "INDEX"):
 			// https://www.sqlite.org/syntax/create-index-stmt.html
 			err := parseCreateIndex(tokens)
 			if err != nil {
@@ -96,20 +96,20 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 		Columns:     make([]Column, 0),
 	}
 
-	if tokens.Take() != "CREATE" {
+	if !tokens.TakeKeyword("CREATE") {
 		return nil, fmt.Errorf("create table must begin with 'CREATE', not %s", tokens.Next())
 	}
 	// Temporary
-	if tokens.Next() == "TEMP" || tokens.Next() == "TEMPORARY" {
+	if tokens.KeywordIs("TEMP") || tokens.KeywordIs("TEMPORARY") {
 		t.Temp = true
 		tokens.Take()
 	}
-	if tokens.Take() != "TABLE" {
+	if !tokens.TakeKeyword("TABLE") {
 		return nil, fmt.Errorf("create table must begin with 'CREATE [TEMP|TEMPORARY] TABLE', not %s", tokens.Next())
 	}
 	// If not exists
-	if tokens.Next() == "IF" {
-		if tokens.NextN(3) == "IF NOT EXISTS" {
+	if tokens.KeywordIs("IF") {
+		if tokens.KeywordSeq("IF", "NOT", "EXISTS") {
 			tokens.TakeN(3)
 			t.IfNotExists = true
 		} else {
@@ -138,26 +138,20 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 			parseComment(tokens)
 			continue
 		}
-		switch tokens.Next() {
-		case ")": // End of Table Definition
+		switch {
+		case tokens.Next() == ")": // End of Table Definition
 			tokens.Take()
 			if tokens.Next() == ";" { // Optional semicolon
 				tokens.Take()
 			}
 			return t, nil
-		case "": // Table wasn't closed properly or something went wrong
+		case tokens.Next() == "": // Table wasn't closed properly or something went wrong
 			return nil, fmt.Errorf("ran out of tokens unexpectedly - table was likely not closed properly")
-		case ",":
+		case tokens.Next() == ",":
 			tokens.Take()
-		case "CONSTRAINT": // Named table constraint
-			parseTableConstraint(tokens, t)
-		case "PRIMARY": // table-constraint
-			parseTableConstraint(tokens, t)
-		case "UNIQUE": // table-constraint
-			parseTableConstraint(tokens, t)
-		case "CHECK": // table-constraint
-			parseTableConstraint(tokens, t)
-		case "FOREIGN": // table-constraint
+		// table-constraint: CONSTRAINT, PRIMARY KEY, UNIQUE, CHECK, or FOREIGN KEY
+		case tokens.KeywordIs("CONSTRAINT"), tokens.KeywordIs("PRIMARY"), tokens.KeywordIs("UNIQUE"),
+			tokens.KeywordIs("CHECK"), tokens.KeywordIs("FOREIGN"):
 			parseTableConstraint(tokens, t)
 		default: // column-def
 			col, fk, err := parseColumn(tokens, t.Strict)
@@ -204,43 +198,41 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 			break
 		} else if tokens.NextType() == Comment {
 			c.Comment = parseComment(tokens)
-		} else if token == "NOT" {
-			if tokens.NextN(2) != "NOT NULL" {
-				return c, nil, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
-			}
+		} else if tokens.KeywordSeq("NOT", "NULL") {
 			// TODO: Handle [conflict-clause]
 			c.Nullable = false
 			tokens.TakeN(2)
-		} else if token == "PRIMARY" {
-			if tokens.NextN(2) != "PRIMARY KEY" {
-				return c, nil, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
-			}
+		} else if tokens.KeywordIs("NOT") {
+			return c, nil, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
+		} else if tokens.KeywordSeq("PRIMARY", "KEY") {
 			// TODO: Handle [ASC|DESC] and [conflict-clause]
 			c.PrimaryKey = true
 			tokens.TakeN(2)
-		} else if token == "AUTOINCREMENT" {
+		} else if tokens.KeywordIs("PRIMARY") {
+			return c, nil, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
+		} else if tokens.KeywordIs("AUTOINCREMENT") {
 			if c.PrimaryKey {
 				tokens.Take() // Consume ONE token
 			} else {
 				return c, nil, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
 			}
-		} else if token == "UNIQUE" {
+		} else if tokens.KeywordIs("UNIQUE") {
 			// TODO: Handle [conflict-clause]
 			c.Unique = true
 			tokens.Take() // Consume ONE token
-		} else if token == "REFERENCES" { // Foreign Key
+		} else if tokens.KeywordIs("REFERENCES") { // Foreign Key
 			fk, err = parseForeignKey(tokens, &c)
 			if err != nil {
 				return c, nil, err
 			}
-		} else if token == "CHECK" { // CHECK column constraint
+		} else if tokens.KeywordIs("CHECK") { // CHECK column constraint
 			parseCheckConstraint(tokens)
-		} else if token == "DEFAULT" {
+		} else if tokens.KeywordIs("DEFAULT") {
 			tokens.Take()
 			switch c.Type {
 			case INT:
 				token := tokens.Take()
-				if token != "NULL" { // TODO: How to mark explicitly as DEFAULTS TO NULL?
+				if !strings.EqualFold(token, "NULL") { // TODO: How to mark explicitly as DEFAULTS TO NULL?
 					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
 					if err != nil {
 						return c, nil, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
@@ -248,8 +240,8 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
 				}
 			case TEXT:
-				if token != "NULL" {
-					token := tokens.Take()
+				token := tokens.Take()
+				if !strings.EqualFold(token, "NULL") {
 					c.DefaultString = sql.NullString{Valid: true, String: removeQuotes(token)}
 				}
 			case BOOL:
@@ -258,12 +250,12 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 					token = tokens.Take() // This should be TRUE or FALSE
 					tokens.Take()         // Take closing parenthesis
 				}
-				switch token {
+				switch strings.ToUpper(token) {
 				case "NULL":
 					// TODO: How to mark explicitly as DEFAULTS TO NULL?
-				case "true", "TRUE", "1":
+				case "TRUE", "1":
 					c.DefaultBool = sql.NullBool{Valid: true, Bool: true}
-				case "false", "FALSE", "0":
+				case "FALSE", "0":
 					c.DefaultBool = sql.NullBool{Valid: true, Bool: false}
 				default:
 					return c, nil, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
@@ -287,7 +279,8 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 // SQLite Docs: https://www.sqlite.org/datatype3.html
 // mattn/go-sqlit3 Docs: https://pkg.go.dev/github.com/mattn/go-sqlite3#hdr-Supported_Types
 func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
-	s := tokens.Take()
+	raw := tokens.Take()
+	s := strings.ToUpper(raw) // SQLite type names are case-insensitive (e.g. integer == INTEGER).
 	switch s {
 	case "INT", "INTEGER":
 		c.Type = INT
@@ -307,13 +300,13 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 		return nil
 	case "BOOL", "BOOLEAN":
 		if strict {
-			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", s)
+			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", raw)
 		}
 		c.Type = BOOL
 		return nil
 	case "DATETIME", "TIMESTAMP":
 		if strict {
-			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", s)
+			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", raw)
 		}
 		c.Type = DATETIME
 		return nil
@@ -324,7 +317,7 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 		return nil
 	default:
 		if strict {
-			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", s)
+			return fmt.Errorf("\"%s\" is not a valid SQLite column type when \"strict\" is enabled", raw)
 		}
 		c.Type = BLOB
 		return nil
@@ -364,8 +357,7 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 	if len(fk.LocalColumns) == 0 {
 		return nil, fmt.Errorf("foreign key clause must specify at least one column")
 	}
-	if tokens.Take() != "REFERENCES" {
-		tokens.Return()
+	if !tokens.TakeKeyword("REFERENCES") {
 		return nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
 	}
 	fk.Table = tokens.Take() // table-name
@@ -396,13 +388,13 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 func parseFkConstraints(tokens *Tokens, fk *ForeignKey) error {
 	for {
 		switch {
-		case tokens.Next() == "ON":
+		case tokens.KeywordIs("ON"):
 			if err := parseFkAction(tokens, fk); err != nil {
 				return err
 			}
-		case tokens.Next() == "MATCH":
+		case tokens.KeywordIs("MATCH"):
 			tokens.TakeN(2) // MATCH name (parsed but ignored, like SQLite)
-		case tokens.Next() == "DEFERRABLE", tokens.NextN(2) == "NOT DEFERRABLE":
+		case tokens.KeywordIs("DEFERRABLE"), tokens.KeywordSeq("NOT", "DEFERRABLE"):
 			parseDeferrable(tokens)
 		default:
 			return nil
@@ -413,45 +405,43 @@ func parseFkConstraints(tokens *Tokens, fk *ForeignKey) error {
 // parseDeferrable consumes a [NOT] DEFERRABLE [INITIALLY DEFERRED | INITIALLY IMMEDIATE] clause.
 // It is parsed but ignored, matching SQLite's behavior.
 func parseDeferrable(tokens *Tokens) {
-	if tokens.Next() == "NOT" {
-		tokens.Take()
-	}
+	tokens.TakeKeyword("NOT")
 	tokens.Take() // DEFERRABLE
-	if tokens.NextN(2) == "INITIALLY DEFERRED" || tokens.NextN(2) == "INITIALLY IMMEDIATE" {
+	if tokens.KeywordSeq("INITIALLY", "DEFERRED") || tokens.KeywordSeq("INITIALLY", "IMMEDIATE") {
 		tokens.TakeN(2)
 	}
 }
 
 func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 	switch {
-	case tokens.NextN(3) == "ON DELETE CASCADE":
+	case tokens.KeywordSeq("ON", "DELETE", "CASCADE"):
 		tokens.TakeN(3)
 		fk.OnDelete = Cascade
-	case tokens.NextN(3) == "ON UPDATE CASCADE":
+	case tokens.KeywordSeq("ON", "UPDATE", "CASCADE"):
 		tokens.TakeN(3)
 		fk.OnUpdate = Cascade
-	case tokens.NextN(3) == "ON DELETE RESTRICT":
+	case tokens.KeywordSeq("ON", "DELETE", "RESTRICT"):
 		tokens.TakeN(3)
 		fk.OnDelete = Restrict
-	case tokens.NextN(3) == "ON UPDATE RESTRICT":
+	case tokens.KeywordSeq("ON", "UPDATE", "RESTRICT"):
 		tokens.TakeN(3)
 		fk.OnUpdate = Restrict
-	case tokens.NextN(4) == "ON DELETE NO ACTION":
+	case tokens.KeywordSeq("ON", "DELETE", "NO", "ACTION"):
 		tokens.TakeN(4)
 		fk.OnDelete = NoAction
-	case tokens.NextN(4) == "ON UPDATE NO ACTION":
+	case tokens.KeywordSeq("ON", "UPDATE", "NO", "ACTION"):
 		tokens.TakeN(4)
 		fk.OnUpdate = NoAction
-	case tokens.NextN(4) == "ON DELETE SET NULL":
+	case tokens.KeywordSeq("ON", "DELETE", "SET", "NULL"):
 		tokens.TakeN(4)
 		fk.OnDelete = SetNull
-	case tokens.NextN(4) == "ON UPDATE SET NULL":
+	case tokens.KeywordSeq("ON", "UPDATE", "SET", "NULL"):
 		tokens.TakeN(4)
 		fk.OnUpdate = SetNull
-	case tokens.NextN(4) == "ON DELETE SET DEFAULT":
+	case tokens.KeywordSeq("ON", "DELETE", "SET", "DEFAULT"):
 		tokens.TakeN(4)
 		fk.OnDelete = SetDefault
-	case tokens.NextN(4) == "ON UPDATE SET DEFAULT":
+	case tokens.KeywordSeq("ON", "UPDATE", "SET", "DEFAULT"):
 		tokens.TakeN(4)
 		fk.OnUpdate = SetDefault
 	default:
@@ -462,7 +452,7 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 
 func parseDatetimeDefault(tokens *Tokens) {
 	t := tokens.Take()
-	if t == "NULL" {
+	if strings.EqualFold(t, "NULL") {
 		log.Debug("[IGNORED] DateTime Default: NULL")
 		return
 	}
@@ -490,21 +480,21 @@ func parseDatetimeDefault(tokens *Tokens) {
 func parseTableConstraint(tokens *Tokens, table *Table) error {
 	name := ""
 	switch {
-	case tokens.Next() == "CONSTRAINT": // Named table constraint (which is optional)
+	case tokens.KeywordIs("CONSTRAINT"): // Named table constraint (which is optional)
 		name = tokens.Take()
 		log.Debugf("[IGNORED] Table Constraint Constraint: %s", tokens.Take())
-	case tokens.NextN(2) == "PRIMARY KEY": // table-constraint
+	case tokens.KeywordSeq("PRIMARY", "KEY"): // table-constraint
 		tokens.TakeN(2) // PRIMARY KEY
 		table.SetPrimaryKeys(parseIndexedColumn(tokens))
 		// TODO: Handle conflict clause
-	case tokens.Next() == "UNIQUE": // table-constraint
+	case tokens.KeywordIs("UNIQUE"): // table-constraint
 		tokens.Take()
 		cols := parseIndexedColumn(tokens)
 		// TODO: Handle conflict clause
 		log.Debugf("[IGNORED] Table Constraint Unique '%s' Columns %v", name, cols)
-	case tokens.Next() == "CHECK": // table-constraint
+	case tokens.KeywordIs("CHECK"): // table-constraint
 		parseCheckConstraint(tokens)
-	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
+	case tokens.KeywordSeq("FOREIGN", "KEY"): // table-constraint
 		tokens.TakeN(2)
 		fk, err := parseForeignKeyClause(tokens)
 		if err != nil {

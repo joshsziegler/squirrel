@@ -48,12 +48,12 @@ Please run `make pre-commit` before committing and especially before creating me
 - [ ] Add support for DB-provided timestamps such as `created_at`, `updated_at`, and `deleted_at`
 - [ ] Triggers
 - [ ] Add option to include or exclude rows that have been soft-deleted (i.e. `deleted_at`)
-- [ ] Foreign key clauses spanning multiple lines (the `ON`, `MATCH`, and `DEFERRABLE` clauses must currently be on the same line as `REFERENCES`)
-- [ ] Multi-column foreign keys (e.g. `FOREIGN KEY (a, b) REFERENCES t (x, y)`)
+- [x] Foreign key clauses spanning multiple lines (the `ON`, `MATCH`, and `DEFERRABLE` clauses may now wrap across lines)
+- [x] Multi-column (composite) foreign keys (e.g. `FOREIGN KEY (a, b) REFERENCES t (x, y)`)
 - [ ] Conflict clauses (e.g. `ON CONFLICT ...` on `NOT NULL`, `PRIMARY KEY`, `UNIQUE`, and foreign keys)
 - [ ] Generated/computed columns (e.g. `total AS (qty * price) STORED`)
 - [ ] `CREATE TABLE ... AS SELECT`
 - [ ] `COLLATE`, and `ASC`/`DESC` on columns and indexed columns
-- [ ] Alternative identifier quoting: `[name]` and `` `name` ``
-- [ ] Quoted identifiers or string literals containing whitespace (the lexer splits tokens on spaces)
+- [x] Alternative identifier quoting: `[name]` and `` `name` ``
+- [x] Quoted identifiers or string literals containing whitespace (e.g. `"first name"`, `DEFAULT 'in progress'`)
 - [ ] Reject identifiers that are reserved SQLite keywords (validation currently unused)

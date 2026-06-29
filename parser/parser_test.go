@@ -1025,6 +1025,66 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"case-insensitive keywords and types, with a quoted keyword as a column name",
+			`create table parents (
+				id integer not null primary key
+			);
+			create table children (
+				id			integer not null primary key autoincrement,
+				name		text unique default 'bob',
+				"check"		text not null,
+				parent_id	integer not null references parents (id) on delete cascade
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: true, Unique: true, DefaultString: sql.NullString{Valid: true, String: "bob"}},
+						// "check" is a quoted identifier, so it must be treated as a column name, NOT
+						// the CHECK keyword that the table-constraint dispatch looks for.
+						{sqlName: "check", goName: "Check", Type: TEXT, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"DEFAULT NULL leaves the column with no default value",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				note	TEXT    DEFAULT NULL,
+				label	TEXT    DEFAULT null,
+				count	INTEGER DEFAULT NULL
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						// DEFAULT NULL (any case) must NOT store the literal string "NULL" as the default.
+						{sqlName: "note", goName: "Note", Type: TEXT, Nullable: true},
+						{sqlName: "label", goName: "Label", Type: TEXT, Nullable: true},
+						{sqlName: "count", goName: "Count", Type: INT, Nullable: true},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

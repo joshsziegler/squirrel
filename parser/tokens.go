@@ -43,6 +43,33 @@ func (t *Tokens) NextNewlineBefore() bool {
 	return false
 }
 
+// KeywordIs reports whether the next token is the given keyword (unquoted bare word, matched
+// case-insensitively).
+func (t *Tokens) KeywordIs(kw string) bool {
+	return t.i < len(t.toks) && t.toks[t.i].isKeyword(kw)
+}
+
+// KeywordSeq reports whether the next tokens are exactly the given keywords, in order (each an
+// unquoted bare word, matched case-insensitively).
+func (t *Tokens) KeywordSeq(kws ...string) bool {
+	for j, kw := range kws {
+		if t.i+j >= len(t.toks) || !t.toks[t.i+j].isKeyword(kw) {
+			return false
+		}
+	}
+	return true
+}
+
+// TakeKeyword consumes the next token and returns true if it is the given keyword; otherwise it
+// leaves the position unchanged and returns false.
+func (t *Tokens) TakeKeyword(kw string) bool {
+	if t.KeywordIs(kw) {
+		t.i++
+		return true
+	}
+	return false
+}
+
 // NextN returns the values of the next N tokens concatenated with single spaces.
 // This does not "take" the tokens, so further calls will return the same tokens.
 // If there are not n more tokens, returns the remainder (e.g. two tokens when three were requested).
