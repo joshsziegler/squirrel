@@ -1,13 +1,13 @@
 module github.com/joshsziegler/squirrel
 
-go 1.21.5
+go 1.25.0
 
 require (
 	github.com/carlmjohnson/versioninfo v0.22.5
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/joshsziegler/zgo v0.11.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/text v0.14.0
+	golang.org/x/text v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
