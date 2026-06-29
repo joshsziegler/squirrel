@@ -15,7 +15,8 @@ type Table struct {
 	Temp        bool
 	IfNotExists bool
 	Columns     []Column
-	Comment     string // Comment at the end of the CREATE TABLE definition if provided.
+	ForeignKeys []*ForeignKey // ForeignKeys defined on this table (inline single-column and table-level, possibly composite).
+	Comment     string        // Comment at the end of the CREATE TABLE definition if provided.
 }
 
 func (t *Table) GoName() string  { return t.goName }
@@ -63,16 +64,31 @@ func (t *Table) SetPrimaryKeys(colNames []string) error {
 	return nil
 }
 
-// SetForeignKey attaches a foreign key parsed from a table-level FOREIGN KEY clause to its
-// local column. The column MUST be defined by the time this method is called.
-func (t *Table) SetForeignKey(localColumn string, fk *ForeignKey) error {
-	for i := range t.Columns {
-		if t.Columns[i].SQLName() == localColumn {
-			t.Columns[i].ForeignKey = fk
-			return nil
+// AddForeignKey validates a parsed foreign key and adds it to the table. Every local column named
+// by the foreign key MUST be defined by the time this method is called, and the number of local and
+// referenced columns must match.
+func (t *Table) AddForeignKey(fk *ForeignKey) error {
+	if len(fk.LocalColumns) != len(fk.Columns) {
+		return fmt.Errorf("foreign key has %d local column(s) but %d referenced column(s): %v -> %v",
+			len(fk.LocalColumns), len(fk.Columns), fk.LocalColumns, fk.Columns)
+	}
+	for _, localColumn := range fk.LocalColumns {
+		if !t.hasColumn(localColumn) {
+			return fmt.Errorf("foreign key references unknown column %q", localColumn)
 		}
 	}
-	return fmt.Errorf("foreign key clause references unknown column %q", localColumn)
+	t.ForeignKeys = append(t.ForeignKeys, fk)
+	return nil
+}
+
+// hasColumn returns true if the table has a column with the given SQL name.
+func (t *Table) hasColumn(sqlName string) bool {
+	for i := range t.Columns {
+		if t.Columns[i].SQLName() == sqlName {
+			return true
+		}
+	}
+	return false
 }
 
 // PrimaryKeys returns the column(s).

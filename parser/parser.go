@@ -170,29 +170,37 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 		case "FOREIGN": // table-constraint
 			parseTableConstraint(tokens, t)
 		default: // column-def
-			col, err := parseColumn(tokens, t.Strict)
+			col, fk, err := parseColumn(tokens, t.Strict)
 			if err != nil {
 				return nil, err
 			}
 			t.Columns = append(t.Columns, col)
+			if fk != nil {
+				if err := t.AddForeignKey(fk); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 }
 
-// parseColumn
-func parseColumn(tokens *Tokens, strict bool) (Column, error) {
+// parseColumn parses a single column definition. If the column declares an inline (single-column)
+// foreign key via REFERENCES, it is returned as the second value (nil otherwise) so the caller can
+// attach it to the table; foreign keys are stored on the Table, not the Column.
+func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 	c := Column{
 		PrimaryKey: false,
 		Nullable:   true,
 		Unique:     false,
 	}
+	var fk *ForeignKey
 
 	// Name
 	c.SetSQLName(removeQuotes(tokens.Take()))
 	// Data Type
 	err := parseColumnDataType(tokens, &c, strict)
 	if err != nil {
-		return c, err
+		return c, nil, err
 	}
 	// Constraints
 	// SQlite Docs: https://www.sqlite.org/syntax/column-constraint.html
@@ -212,14 +220,14 @@ func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 			c.Comment = parseComment(tokens)
 		} else if token == "NOT" {
 			if tokens.NextN(2) != "NOT NULL" {
-				return c, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
+				return c, nil, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
 			}
 			// TODO: Handle [conflict-clause]
 			c.Nullable = false
 			tokens.TakeN(2)
 		} else if token == "PRIMARY" {
 			if tokens.NextN(2) != "PRIMARY KEY" {
-				return c, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
+				return c, nil, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
 			}
 			// TODO: Handle [ASC|DESC] and [conflict-clause]
 			c.PrimaryKey = true
@@ -228,16 +236,16 @@ func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 			if c.PrimaryKey {
 				tokens.Take() // Consume ONE token
 			} else {
-				return c, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
+				return c, nil, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
 			}
 		} else if token == "UNIQUE" {
 			// TODO: Handle [conflict-clause]
 			c.Unique = true
 			tokens.Take() // Consume ONE token
 		} else if token == "REFERENCES" { // Foreign Key
-			err = parseForeignKey(tokens, &c)
+			fk, err = parseForeignKey(tokens, &c)
 			if err != nil {
-				return c, err
+				return c, nil, err
 			}
 		} else if token == "CHECK" { // CHECK column constraint
 			parseCheckConstraint(tokens)
@@ -249,7 +257,7 @@ func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 				if token != "NULL" { // TODO: How to mark explicitly as DEFAULTS TO NULL?
 					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
 					if err != nil {
-						return c, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
+						return c, nil, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
 					}
 					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
 				}
@@ -272,19 +280,19 @@ func parseColumn(tokens *Tokens, strict bool) (Column, error) {
 				case "false", "FALSE", "0":
 					c.DefaultBool = sql.NullBool{Valid: true, Bool: false}
 				default:
-					return c, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
+					return c, nil, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
 				}
 			case DATETIME:
 				parseDatetimeDefault(tokens)
 			default:
-				return c, fmt.Errorf("default values for %s type are not supported", c.Type)
+				return c, nil, fmt.Errorf("default values for %s type are not supported", c.Type)
 			}
 		} else {
-			return c, fmt.Errorf("unrecognized column constraint for column \"%s\" starting with: \"%s\"", c.SQLName(), tokens.NextN(5))
+			return c, nil, fmt.Errorf("unrecognized column constraint for column \"%s\" starting with: \"%s\"", c.SQLName(), tokens.NextN(5))
 		}
 	}
 
-	return c, nil
+	return c, fk, nil
 }
 
 // Column Type
@@ -337,57 +345,61 @@ func parseColumnDataType(tokens *Tokens, c *Column, strict bool) error {
 	}
 }
 
-// parseForeignKey assumes the Next() token is "REFERENCES" and takes over parsing the rest of the parsing.
-func parseForeignKey(tokens *Tokens, c *Column) error {
+// parseForeignKey assumes the Next() token is "REFERENCES" and parses an inline foreign key for
+// column c, returning it. Inline foreign keys always reference a single column.
+func parseForeignKey(tokens *Tokens, c *Column) (*ForeignKey, error) {
 	if tokens.Peek(1) == "" {
-		return fmt.Errorf("column foreign key constraint 'REFERENCES' must be followed by a table name, not %s", tokens.NextN(2))
+		return nil, fmt.Errorf("column foreign key constraint 'REFERENCES' must be followed by a table name, not %s", tokens.NextN(2))
 	}
 	tokens.Take()
 	// TODO: Handle [conflict-clause]
-	c.ForeignKey = &ForeignKey{Table: tokens.Take()}
-	if tokens.Next() == "(" && tokens.Peek(2) == ")" { // If the column is specified
-		c.ForeignKey.Column = tokens.Peek(1)
+	fk := &ForeignKey{Table: tokens.Take(), LocalColumns: []string{c.SQLName()}}
+	if tokens.Next() == "(" && tokens.Peek(2) == ")" { // If the referenced column is specified
+		fk.Columns = []string{tokens.Peek(1)}
 		tokens.TakeN(3)
 	} else {
-		c.ForeignKey.Column = c.SQLName() // Not specified, so it should be the same name as THIS column name.
+		fk.Columns = []string{c.SQLName()} // Not specified, so it should be the same name as THIS column name.
 	}
-	return parseFkConstraints(tokens, c.ForeignKey)
+	if err := parseFkConstraints(tokens, fk); err != nil {
+		return nil, err
+	}
+	return fk, nil
 }
 
 // foreign-key-clause
 // Note this is different from an inline FK definition, and can reference multiple columns.
 // https://www.sqlite.org/syntax/foreign-key-clause.html
 //
-// It returns the local (FROM) column the constraint applies to alongside the parsed
-// ForeignKey, so the caller can attach the FK to that column.
-//
-// TODO: Handle multiple columns in a foreign-key-clause.
-func parseForeignKeyClause(tokens *Tokens) (string, *ForeignKey, error) {
+// The returned ForeignKey has its LocalColumns (FROM) and Columns (TO) populated, paired
+// positionally. The caller is responsible for validating and attaching it to the table.
+func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 	fk := &ForeignKey{}
-	cols := parseColumnList(tokens)
-	if len(cols) > 1 {
-		return "", nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
+	fk.LocalColumns = parseColumnList(tokens) // FROM-COLUMN(s)
+	if len(fk.LocalColumns) == 0 {
+		return nil, fmt.Errorf("foreign key clause must specify at least one column")
 	}
-	localColumn := cols[0] // FROM-COLUMN
 	removeNewlines(tokens)
 	if tokens.Take() != "REFERENCES" {
 		tokens.Return()
-		return "", nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
+		return nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
 	}
 	fk.Table = tokens.Take() // table-name
-	cols = parseColumnList(tokens)
-	if len(cols) > 1 {
-		return "", nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
-	}
-	if len(cols) == 1 {
-		fk.Column = cols[0] // TO-COLUMN (referenced column)
+	refCols := parseColumnList(tokens)
+	if len(refCols) == 0 {
+		// Referenced columns omitted: SQLite references the foreign table's primary key. We
+		// approximate by reusing the local column names (as inline FKs do).
+		fk.Columns = append([]string{}, fk.LocalColumns...)
 	} else {
-		fk.Column = localColumn // Not specified, so assume it matches the local column name (like inline FKs).
+		fk.Columns = refCols // TO-COLUMN(s)
+	}
+	if len(fk.LocalColumns) != len(fk.Columns) {
+		return nil, fmt.Errorf("foreign key clause has %d local column(s) but %d referenced column(s): %v -> %v",
+			len(fk.LocalColumns), len(fk.Columns), fk.LocalColumns, fk.Columns)
 	}
 	if err := parseFkConstraints(tokens, fk); err != nil {
-		return "", nil, err
+		return nil, err
 	}
-	return localColumn, fk, nil
+	return fk, nil
 }
 
 // parseFkConstraints consumes the clauses that may follow the referenced table/column list in a
@@ -509,11 +521,11 @@ func parseTableConstraint(tokens *Tokens, table *Table) error {
 		parseCheckConstraint(tokens)
 	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
 		tokens.TakeN(2)
-		localColumn, fk, err := parseForeignKeyClause(tokens)
+		fk, err := parseForeignKeyClause(tokens)
 		if err != nil {
 			return err
 		}
-		if err := table.SetForeignKey(localColumn, fk); err != nil {
+		if err := table.AddForeignKey(fk); err != nil {
 			return err
 		}
 	}

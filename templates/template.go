@@ -127,7 +127,7 @@ func Table(w *ShortWriter, t *parser.Table) {
 	}
 	w.F("type %s struct {\n", t.GoName())
 	for _, c := range t.Columns {
-		columnToGo(w, &c)
+		columnToGo(w, &c, t)
 	}
 	w.N(`	_exists, _deleted bool // In-memory-only metadata on this row's status in the DB`)
 	w.F("}\n\n")
@@ -154,7 +154,7 @@ func Table(w *ShortWriter, t *parser.Table) {
 
 // columnToGo converts a Column to its Go-ORM layer.
 // Adds a comment about whether this column is Unique, has a Default, and the SQL comment
-func columnToGo(w *ShortWriter, c *parser.Column) {
+func columnToGo(w *ShortWriter, c *parser.Column, t *parser.Table) {
 	commentParts := []string{}
 	if c.PrimaryKey {
 		commentParts = append(commentParts, "PK")
@@ -165,8 +165,19 @@ func columnToGo(w *ShortWriter, c *parser.Column) {
 	if c.Unique {
 		commentParts = append(commentParts, "Unique")
 	}
-	if c.ForeignKey != nil {
-		commentParts = append(commentParts, fmt.Sprintf("FK: %s.%s", c.ForeignKey.Table, c.ForeignKey.Column))
+	// Foreign keys are stored on the table; surface any that include this column, pairing it with
+	// the referenced column at the same position.
+	for _, fk := range t.ForeignKeys {
+		for i, local := range fk.LocalColumns {
+			if local != c.SQLName() {
+				continue
+			}
+			label := "FK"
+			if fk.Composite() {
+				label = "Composite FK"
+			}
+			commentParts = append(commentParts, fmt.Sprintf("%s: %s.%s", label, fk.Table, fk.Columns[i]))
+		}
 	}
 	switch {
 	case c.DefaultBool.Valid:

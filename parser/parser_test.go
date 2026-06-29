@@ -216,7 +216,10 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
 						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Comment: "Name may not be unique!"},
-						{sqlName: "spouse", goName: "Spouse", Type: INT, Nullable: true, ForeignKey: &ForeignKey{Table: "people", Column: "id"}, Comment: "Husband or Wife within this table"},
+						{sqlName: "spouse", goName: "Spouse", Type: INT, Nullable: true, Comment: "Husband or Wife within this table"},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "people", LocalColumns: []string{"spouse"}, Columns: []string{"id"}},
 					},
 				},
 			},
@@ -291,8 +294,12 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
 						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: false},
-						{sqlName: "box_id", goName: "BoxID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "boxes", Column: "id", OnDelete: Cascade}},
-						{sqlName: "franchise_name", goName: "FranchiseName", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "franchises", Column: "name", OnUpdate: Cascade, OnDelete: SetNull}},
+						{sqlName: "box_id", goName: "BoxID", Type: INT, Nullable: false},
+						{sqlName: "franchise_name", goName: "FranchiseName", Type: TEXT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "boxes", LocalColumns: []string{"box_id"}, Columns: []string{"id"}, OnDelete: Cascade},
+						{Table: "franchises", LocalColumns: []string{"franchise_name"}, Columns: []string{"name"}, OnUpdate: Cascade, OnDelete: SetNull},
 					},
 				},
 			},
@@ -332,8 +339,12 @@ func TestParse(t *testing.T) {
 					sqlName: "user_group",
 					goName:  "UserGroup",
 					Columns: []Column{
-						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "users", Column: "user_id"}, Comment: "Column name is implied by omitting it"},
-						{sqlName: "group_name", goName: "GroupName", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "groups", Column: "group_name"}},
+						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false, Comment: "Column name is implied by omitting it"},
+						{sqlName: "group_name", goName: "GroupName", Type: TEXT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "users", LocalColumns: []string{"user_id"}, Columns: []string{"user_id"}},
+						{Table: "groups", LocalColumns: []string{"group_name"}, Columns: []string{"group_name"}},
 					},
 				},
 			},
@@ -397,9 +408,12 @@ func TestParse(t *testing.T) {
 					sqlName: "albums",
 					goName:  "Album",
 					Columns: []Column{
-						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnDelete: Cascade}},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false},
 						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false},
 						{sqlName: "year", goName: "Year", Type: INT, PrimaryKey: false, Nullable: true},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "artist", LocalColumns: []string{"artist"}, Columns: []string{"name"}, OnDelete: Cascade},
 					},
 				},
 			},
@@ -419,8 +433,11 @@ func TestParse(t *testing.T) {
 					sqlName: "job_extended_attrs",
 					goName:  "JobExtendedAttr",
 					Columns: []Column{
-						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: true, Nullable: false, ForeignKey: &ForeignKey{Table: "jobsCache", Column: "id", OnDelete: Cascade}},
+						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: true, Nullable: false},
 						{sqlName: "auto_extend", goName: "AutoExtend", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "jobsCache", LocalColumns: []string{"fk_job_id"}, Columns: []string{"id"}, OnDelete: Cascade},
 					},
 				},
 			},
@@ -517,8 +534,11 @@ func TestParse(t *testing.T) {
 					goName:  "IPLoginAttempt",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
-						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "ip_login_summary", Column: "ip", OnUpdate: Cascade, OnDelete: Cascade}},
+						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false},
 						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "ip_login_summary", LocalColumns: []string{"ip"}, Columns: []string{"ip"}, OnUpdate: Cascade, OnDelete: Cascade},
 					},
 				},
 			},
@@ -555,8 +575,11 @@ func TestParse(t *testing.T) {
 					goName:  "IPLoginAttempt",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
-						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "ip_login_summary", Column: "ip", OnUpdate: Cascade, OnDelete: Cascade}},
+						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false},
 						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "ip_login_summary", LocalColumns: []string{"ip"}, Columns: []string{"ip"}, OnUpdate: Cascade, OnDelete: Cascade},
 					},
 				},
 			},
@@ -646,9 +669,14 @@ func TestParse(t *testing.T) {
 					goName:  "Child",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnDelete: Restrict}},
-						{sqlName: "guardian_id", goName: "GuardianID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnDelete: NoAction}},
-						{sqlName: "sponsor_id", goName: "SponsorID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnUpdate: Restrict, OnDelete: NoAction}},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false},
+						{sqlName: "guardian_id", goName: "GuardianID", Type: INT, Nullable: false},
+						{sqlName: "sponsor_id", goName: "SponsorID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Restrict},
+						{Table: "parents", LocalColumns: []string{"guardian_id"}, Columns: []string{"id"}, OnDelete: NoAction},
+						{Table: "parents", LocalColumns: []string{"sponsor_id"}, Columns: []string{"id"}, OnUpdate: Restrict, OnDelete: NoAction},
 					},
 				},
 			},
@@ -677,7 +705,10 @@ func TestParse(t *testing.T) {
 					goName:  "Track",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnUpdate: NoAction, OnDelete: Restrict}},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "artist", LocalColumns: []string{"artist"}, Columns: []string{"name"}, OnUpdate: NoAction, OnDelete: Restrict},
 					},
 				},
 			},
@@ -706,7 +737,10 @@ func TestParse(t *testing.T) {
 					goName:  "Track",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnDelete: Cascade}},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "artist", LocalColumns: []string{"artist"}, Columns: []string{"name"}, OnDelete: Cascade},
 					},
 				},
 			},
@@ -734,7 +768,10 @@ func TestParse(t *testing.T) {
 					goName:  "Child",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnDelete: Cascade}},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
 					},
 				},
 			},
@@ -763,7 +800,98 @@ func TestParse(t *testing.T) {
 					goName:  "Track",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnUpdate: Cascade}},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "artist", LocalColumns: []string{"artist"}, Columns: []string{"name"}, OnUpdate: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"table-level composite Foreign Key",
+			`CREATE TABLE parents (
+				first_name	TEXT NOT NULL,
+				last_name	TEXT NOT NULL,
+				PRIMARY KEY (first_name, last_name)
+			);
+			CREATE TABLE children (
+				id			INTEGER NOT NULL PRIMARY KEY,
+				parent_first	TEXT NOT NULL,
+				parent_last		TEXT NOT NULL,
+				FOREIGN KEY (parent_first, parent_last) REFERENCES parents (first_name, last_name) ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "first_name", goName: "FirstName", Type: TEXT, CompositePrimaryKey: true, Nullable: false},
+						{sqlName: "last_name", goName: "LastName", Type: TEXT, CompositePrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_first", goName: "ParentFirst", Type: TEXT, Nullable: false},
+						{sqlName: "parent_last", goName: "ParentLast", Type: TEXT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "parents", LocalColumns: []string{"parent_first", "parent_last"}, Columns: []string{"first_name", "last_name"}, OnDelete: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"table with both a composite and a single-column Foreign Key",
+			`CREATE TABLE parents (
+				first_name	TEXT NOT NULL,
+				last_name	TEXT NOT NULL,
+				PRIMARY KEY (first_name, last_name)
+			);
+			CREATE TABLE schools (
+				id		INTEGER NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE children (
+				id				INTEGER NOT NULL PRIMARY KEY,
+				parent_first	TEXT NOT NULL,
+				parent_last		TEXT NOT NULL,
+				school_id		INTEGER NOT NULL REFERENCES schools (id) ON DELETE RESTRICT,
+				FOREIGN KEY (parent_first, parent_last) REFERENCES parents (first_name, last_name) ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "first_name", goName: "FirstName", Type: TEXT, CompositePrimaryKey: true, Nullable: false},
+						{sqlName: "last_name", goName: "LastName", Type: TEXT, CompositePrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "schools",
+					goName:  "School",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_first", goName: "ParentFirst", Type: TEXT, Nullable: false},
+						{sqlName: "parent_last", goName: "ParentLast", Type: TEXT, Nullable: false},
+						{sqlName: "school_id", goName: "SchoolID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						// The inline single-column FK is parsed before the table-level composite clause.
+						{Table: "schools", LocalColumns: []string{"school_id"}, Columns: []string{"id"}, OnDelete: Restrict},
+						{Table: "parents", LocalColumns: []string{"parent_first", "parent_last"}, Columns: []string{"first_name", "last_name"}, OnDelete: Cascade},
 					},
 				},
 			},

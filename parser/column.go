@@ -15,8 +15,7 @@ type Column struct {
 	autoIncrement       bool // AutoIncrement is true if the this column explicitly specified AUTOINCREMENT. Use AutoIncrement()!
 	Nullable            bool
 	Unique              bool
-	Comment             string      // Comment at the end of this column definition if provided.
-	ForeignKey          *ForeignKey // ForeignKey or null.
+	Comment             string // Comment at the end of this column definition if provided.
 
 	// Default which can be a constant or expression and is type-dependent.
 	// TODO: Handle expressions

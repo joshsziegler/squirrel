@@ -27,9 +27,19 @@ func (a OnFkAction) String() string {
 	}
 }
 
+// ForeignKey represents a single foreign-key constraint, which may span one or more columns.
+// Both inline (single-column) and table-level (possibly composite) foreign keys use this type, and
+// are stored on the Table rather than on individual Columns. LocalColumns and Columns are paired
+// positionally: LocalColumns[i] in this table references Columns[i] in the foreign Table.
 type ForeignKey struct {
-	Table    string
-	Column   string
-	OnUpdate OnFkAction // OnUpdate action to take (e.g. none, Set Null, Set Default, etc.)
-	OnDelete OnFkAction // OnDelete action to take (e.g. none, Set Null, Set Default, etc.)
+	Table        string     // Table is the referenced (foreign) table.
+	LocalColumns []string   // LocalColumns are the column(s) in THIS table, in order.
+	Columns      []string   // Columns are the referenced column(s) in Table, paired positionally with LocalColumns.
+	OnUpdate     OnFkAction // OnUpdate action to take (e.g. none, Set Null, Set Default, etc.)
+	OnDelete     OnFkAction // OnDelete action to take (e.g. none, Set Null, Set Default, etc.)
+}
+
+// Composite returns true if this foreign key spans more than one column.
+func (fk *ForeignKey) Composite() bool {
+	return len(fk.LocalColumns) > 1
 }
