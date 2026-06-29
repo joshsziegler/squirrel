@@ -351,17 +351,7 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 	} else {
 		c.ForeignKey.Column = c.SQLName() // Not specified, so it should be the same name as THIS column name.
 	}
-	// ON UPDATE/ON DELETE (can have multiple)
-	for {
-		if tokens.Next() != "ON" {
-			break
-		}
-		err := parseFkAction(tokens, c.ForeignKey)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return parseFkConstraints(tokens, c.ForeignKey)
 }
 
 // foreign-key-clause
@@ -371,7 +361,7 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 // It returns the local (FROM) column the constraint applies to alongside the parsed
 // ForeignKey, so the caller can attach the FK to that column.
 //
-// TODO: Handle rest of foreign-key-clause, including MATCH, [NOT] DEFERRABLE, and multiple columns
+// TODO: Handle multiple columns in a foreign-key-clause.
 func parseForeignKeyClause(tokens *Tokens) (string, *ForeignKey, error) {
 	fk := &ForeignKey{}
 	cols := parseColumnList(tokens)
@@ -394,17 +384,45 @@ func parseForeignKeyClause(tokens *Tokens) (string, *ForeignKey, error) {
 	} else {
 		fk.Column = localColumn // Not specified, so assume it matches the local column name (like inline FKs).
 	}
-	// ON UPDATE/ON DELETE (can have multiple)
-	for {
-		if tokens.Next() != "ON" {
-			break
-		}
-		err := parseFkAction(tokens, fk)
-		if err != nil {
-			return "", nil, err
-		}
+	if err := parseFkConstraints(tokens, fk); err != nil {
+		return "", nil, err
 	}
 	return localColumn, fk, nil
+}
+
+// parseFkConstraints consumes the clauses that may follow the referenced table/column list in a
+// foreign-key definition: any number of ON DELETE/UPDATE and MATCH clauses (in any order),
+// followed by an optional [NOT] DEFERRABLE clause. MATCH and DEFERRABLE are accepted but ignored,
+// matching SQLite's behavior. Shared by inline (parseForeignKey) and table-level
+// (parseForeignKeyClause) foreign keys.
+// https://www.sqlite.org/syntax/foreign-key-clause.html
+func parseFkConstraints(tokens *Tokens, fk *ForeignKey) error {
+	for {
+		switch {
+		case tokens.Next() == "ON":
+			if err := parseFkAction(tokens, fk); err != nil {
+				return err
+			}
+		case tokens.Next() == "MATCH":
+			tokens.TakeN(2) // MATCH name (parsed but ignored, like SQLite)
+		case tokens.Next() == "DEFERRABLE", tokens.NextN(2) == "NOT DEFERRABLE":
+			parseDeferrable(tokens)
+		default:
+			return nil
+		}
+	}
+}
+
+// parseDeferrable consumes a [NOT] DEFERRABLE [INITIALLY DEFERRED | INITIALLY IMMEDIATE] clause.
+// It is parsed but ignored, matching SQLite's behavior.
+func parseDeferrable(tokens *Tokens) {
+	if tokens.Next() == "NOT" {
+		tokens.Take()
+	}
+	tokens.Take() // DEFERRABLE
+	if tokens.NextN(2) == "INITIALLY DEFERRED" || tokens.NextN(2) == "INITIALLY IMMEDIATE" {
+		tokens.TakeN(2)
+	}
 }
 
 func parseFkAction(tokens *Tokens, fk *ForeignKey) error {

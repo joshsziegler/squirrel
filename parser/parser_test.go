@@ -711,6 +711,63 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"inline Foreign Key with MATCH and DEFERRABLE clauses",
+			`CREATE TABLE parents (
+				id		INTEGER NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE children (
+				id			INTEGER NOT NULL PRIMARY KEY,
+				parent_id	INTEGER NOT NULL REFERENCES parents (id) ON DELETE CASCADE MATCH SIMPLE DEFERRABLE INITIALLY DEFERRED
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnDelete: Cascade}},
+					},
+				},
+			},
+		},
+		{
+			"table-level Foreign Key clause with MATCH and NOT DEFERRABLE clauses",
+			`CREATE TABLE artist (
+				name	TEXT NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE track (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				artist	TEXT NOT NULL,
+				FOREIGN KEY (artist) REFERENCES artist (name) MATCH FULL ON UPDATE CASCADE NOT DEFERRABLE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "artist",
+					goName:  "Artist",
+					Columns: []Column{
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "track",
+					goName:  "Track",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnUpdate: Cascade}},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
