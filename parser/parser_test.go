@@ -895,6 +895,136 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"line break: inline FK action continues on the next line",
+			`CREATE TABLE parents (
+				id	INTEGER NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE children (
+				id			INTEGER NOT NULL PRIMARY KEY,
+				parent_id	INTEGER NOT NULL REFERENCES parents (id)
+					ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"line break: table-level FK clause split across multiple lines",
+			`CREATE TABLE parents (
+				id	INTEGER NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE children (
+				id			INTEGER NOT NULL PRIMARY KEY,
+				parent_id	INTEGER NOT NULL,
+				FOREIGN KEY (parent_id)
+					REFERENCES parents (id)
+					ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"quoted identifiers containing spaces",
+			`CREATE TABLE "user accounts" (
+				"full name"	TEXT NOT NULL,
+				"home town"	TEXT
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "user accounts",
+					goName:  "User Account",
+					Columns: []Column{
+						{sqlName: "full name", goName: "Full Name", Type: TEXT, Nullable: false},
+						{sqlName: "home town", goName: "Home Town", Type: TEXT, Nullable: true},
+					},
+				},
+			},
+		},
+		{
+			"bracket and backtick quoted identifiers",
+			"CREATE TABLE [user accounts] (\n\t\t\t\t`full name` TEXT NOT NULL\n\t\t\t)",
+			false,
+			[]*Table{
+				{
+					sqlName: "user accounts",
+					goName:  "User Account",
+					Columns: []Column{
+						{sqlName: "full name", goName: "Full Name", Type: TEXT, Nullable: false},
+					},
+				},
+			},
+		},
+		{
+			"string default containing a space",
+			`CREATE TABLE t (
+				status	TEXT NOT NULL DEFAULT 'in progress'
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "status", goName: "Status", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: "in progress"}},
+					},
+				},
+			},
+		},
+		{
+			"block comment attaches to a column",
+			`CREATE TABLE t (
+				id	INTEGER NOT NULL PRIMARY KEY /* the primary key */
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false, Comment: "the primary key"},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
