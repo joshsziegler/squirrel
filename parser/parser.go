@@ -368,25 +368,32 @@ func parseForeignKey(tokens *Tokens, c *Column) error {
 // Note this is different from an inline FK definition, and can reference multiple columns.
 // https://www.sqlite.org/syntax/foreign-key-clause.html
 //
+// It returns the local (FROM) column the constraint applies to alongside the parsed
+// ForeignKey, so the caller can attach the FK to that column.
+//
 // TODO: Handle rest of foreign-key-clause, including MATCH, [NOT] DEFERRABLE, and multiple columns
-func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
+func parseForeignKeyClause(tokens *Tokens) (string, *ForeignKey, error) {
 	fk := &ForeignKey{}
 	cols := parseColumnList(tokens)
 	if len(cols) > 1 {
-		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
+		return "", nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
 	}
-	fk.Column = cols[0] // FROM-COLUMN
+	localColumn := cols[0] // FROM-COLUMN
 	removeNewlines(tokens)
 	if tokens.Take() != "REFERENCES" {
 		tokens.Return()
-		return nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
+		return "", nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
 	}
 	fk.Table = tokens.Take() // table-name
 	cols = parseColumnList(tokens)
 	if len(cols) > 1 {
-		return nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
+		return "", nil, fmt.Errorf("multiple columns are not currently supported in a foreign key clause: %v", cols)
 	}
-	// cols[0] // TO COLUMN
+	if len(cols) == 1 {
+		fk.Column = cols[0] // TO-COLUMN (referenced column)
+	} else {
+		fk.Column = localColumn // Not specified, so assume it matches the local column name (like inline FKs).
+	}
 	// ON UPDATE/ON DELETE (can have multiple)
 	for {
 		if tokens.Next() != "ON" {
@@ -394,10 +401,10 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 		}
 		err := parseFkAction(tokens, fk)
 		if err != nil {
-			return nil, err
+			return "", nil, err
 		}
 	}
-	return fk, nil
+	return localColumn, fk, nil
 }
 
 func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
@@ -484,12 +491,13 @@ func parseTableConstraint(tokens *Tokens, table *Table) error {
 		parseCheckConstraint(tokens)
 	case tokens.NextN(2) == "FOREIGN KEY": // table-constraint
 		tokens.TakeN(2)
-		// TODO: Handle foreign-key-clause
-		fk, err := parseForeignKeyClause(tokens)
+		localColumn, fk, err := parseForeignKeyClause(tokens)
 		if err != nil {
 			return err
 		}
-		log.Debugf("[IGNORED] Table Constraint Foreign Key Named '%s' --: %+v\n", name, fk)
+		if err := table.SetForeignKey(localColumn, fk); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -63,6 +63,18 @@ func (t *Table) SetPrimaryKeys(colNames []string) error {
 	return nil
 }
 
+// SetForeignKey attaches a foreign key parsed from a table-level FOREIGN KEY clause to its
+// local column. The column MUST be defined by the time this method is called.
+func (t *Table) SetForeignKey(localColumn string, fk *ForeignKey) error {
+	for i := range t.Columns {
+		if t.Columns[i].SQLName() == localColumn {
+			t.Columns[i].ForeignKey = fk
+			return nil
+		}
+	}
+	return fmt.Errorf("foreign key clause references unknown column %q", localColumn)
+}
+
 // PrimaryKeys returns the column(s).
 //
 //	WARNING:: SQLite Docs (https://www.sqlite.org/lang_createtable.html):

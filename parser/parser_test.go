@@ -377,7 +377,7 @@ func TestParse(t *testing.T) {
 					sqlName: "albums",
 					goName:  "Album",
 					Columns: []Column{
-						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, PrimaryKey: false, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnDelete: Cascade}},
 						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false},
 						{sqlName: "year", goName: "Year", Type: INT, PrimaryKey: false, Nullable: true},
 					},
@@ -399,7 +399,7 @@ func TestParse(t *testing.T) {
 					sqlName: "job_extended_attrs",
 					goName:  "JobExtendedAttr",
 					Columns: []Column{
-						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: true, Nullable: false},
+						{sqlName: "fk_job_id", goName: "FkJobID", Type: TEXT, PrimaryKey: true, Nullable: false, ForeignKey: &ForeignKey{Table: "jobsCache", Column: "id", OnDelete: Cascade}},
 						{sqlName: "auto_extend", goName: "AutoExtend", Type: INT, Nullable: false},
 					},
 				},
@@ -497,7 +497,7 @@ func TestParse(t *testing.T) {
 					goName:  "IPLoginAttempt",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
-						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false},
+						{sqlName: "ip", goName: "IP", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "ip_login_summary", Column: "ip", OnUpdate: Cascade, OnDelete: Cascade}},
 						{sqlName: "time", goName: "Time", Type: DATETIME, Nullable: false},
 					},
 				},
@@ -657,10 +657,7 @@ func TestParse(t *testing.T) {
 					goName:  "Track",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						// NOTE: A table-level FOREIGN KEY clause is parsed but not yet attached to the
-						// column, so we only assert here that ON UPDATE NO ACTION / ON DELETE RESTRICT
-						// parse without error (matching the existing "foreign-key-on-own-line" tests).
-						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnUpdate: NoAction, OnDelete: Restrict}},
 					},
 				},
 			},
