@@ -599,6 +599,72 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"inline Foreign Key with ON DELETE/UPDATE RESTRICT and NO ACTION",
+			`CREATE TABLE parents (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				name	TEXT NOT NULL UNIQUE
+			);
+			CREATE TABLE children (
+				id				INTEGER NOT NULL PRIMARY KEY,
+				parent_id		INTEGER NOT NULL REFERENCES parents (id) ON DELETE RESTRICT,
+				guardian_id		INTEGER NOT NULL REFERENCES parents (id) ON DELETE NO ACTION,
+				sponsor_id		INTEGER NOT NULL REFERENCES parents (id) ON UPDATE RESTRICT ON DELETE NO ACTION
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: true},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnDelete: Restrict}},
+						{sqlName: "guardian_id", goName: "GuardianID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnDelete: NoAction}},
+						{sqlName: "sponsor_id", goName: "SponsorID", Type: INT, Nullable: false, ForeignKey: &ForeignKey{Table: "parents", Column: "id", OnUpdate: Restrict, OnDelete: NoAction}},
+					},
+				},
+			},
+		},
+		{
+			"table-level Foreign Key clause with ON DELETE RESTRICT and ON UPDATE NO ACTION",
+			`CREATE TABLE artist (
+				name	TEXT NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE track (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				artist	TEXT NOT NULL,
+				FOREIGN KEY (artist) REFERENCES artist (name) ON UPDATE NO ACTION ON DELETE RESTRICT
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "artist",
+					goName:  "Artist",
+					Columns: []Column{
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "track",
+					goName:  "Track",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						// NOTE: A table-level FOREIGN KEY clause is parsed but not yet attached to the
+						// column, so we only assert here that ON UPDATE NO ACTION / ON DELETE RESTRICT
+						// parse without error (matching the existing "foreign-key-on-own-line" tests).
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -400,8 +400,6 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 	return fk, nil
 }
 
-// TODO: Handle ON (UPDATE|DELETE) RESTRICT
-// TODO: Handle ON (UPDATE|DELETE) NO ACTION
 func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 	switch {
 	case tokens.NextN(3) == "ON DELETE CASCADE":
@@ -410,6 +408,18 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 	case tokens.NextN(3) == "ON UPDATE CASCADE":
 		tokens.TakeN(3)
 		fk.OnUpdate = Cascade
+	case tokens.NextN(3) == "ON DELETE RESTRICT":
+		tokens.TakeN(3)
+		fk.OnDelete = Restrict
+	case tokens.NextN(3) == "ON UPDATE RESTRICT":
+		tokens.TakeN(3)
+		fk.OnUpdate = Restrict
+	case tokens.NextN(4) == "ON DELETE NO ACTION":
+		tokens.TakeN(4)
+		fk.OnDelete = NoAction
+	case tokens.NextN(4) == "ON UPDATE NO ACTION":
+		tokens.TakeN(4)
+		fk.OnUpdate = NoAction
 	case tokens.NextN(4) == "ON DELETE SET NULL":
 		tokens.TakeN(4)
 		fk.OnDelete = SetNull
