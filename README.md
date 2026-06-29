@@ -12,12 +12,25 @@ go install go install mvdan.cc/gofumpt@latest      # Install gofumpt for formatt
 
 # Using
 
+Squirrel reads its settings from a YAML config file. By default it looks for
+`squirrel.yaml` in the current directory; use `-config <path>` to point it
+elsewhere.
+
 ```bash
-$ squirrel
-Usage: squirrel schema dest pkg
-- schema: Path to the SQL schema you wish to parse (e.g. schema.sql)
-- dest: Path to write the resulting Go-to-SQL layer to (e.g. db.go)
-- pkg: Package name to use in the resulting Go code (e.g. db)
+$ squirrel                   # uses ./squirrel.yaml
+$ squirrel -config build/sq.yaml
+```
+
+Example `squirrel.yaml`:
+
+```yaml
+schema: schema.sql        # Path to the SQL schema to parse (required)
+dest: db.go               # Path to write the generated Go to (required)
+package: db               # Package name for the generated Go (required)
+ignore_tables:            # Tables to parse but exclude from the generated Go
+  - goose_db_version
+  - users
+ctx_only: true            # Only emit context-aware DB methods (default: true)
 ```
 
 # Developing

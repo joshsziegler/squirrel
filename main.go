@@ -1,11 +1,13 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
 	"github.com/carlmjohnson/versioninfo"
 
+	"github.com/joshsziegler/squirrel/config"
 	"github.com/joshsziegler/squirrel/parser"
 	"github.com/joshsziegler/squirrel/templates"
 )
@@ -50,32 +52,52 @@ func GenerateGoFromSQL(schemaPath, goPath, pkgName string, ignoreTables []string
 	return nil
 }
 
+// printVersion prints build/version information.
+func printVersion() {
+	fmt.Printf("Version: %s\n", versioninfo.Version)
+	fmt.Printf("Revision: %s\n", versioninfo.Revision)
+	if versioninfo.DirtyBuild { // Don't print this for tagged/released versions
+		fmt.Printf("Dirty: %v\n", versioninfo.DirtyBuild)
+	}
+	fmt.Printf("Built On: %s\n", versioninfo.LastCommit)
+}
+
 func main() {
-	if len(os.Args) < 4 {
-		fmt.Printf("Usage: %s schema dest pkg [ignored_tables]\n", os.Args[0])
+	configPath := flag.String("config", "squirrel.yaml", "Path to the YAML config file")
+	showVersion := flag.Bool("version", false, "Print version information and exit")
+	flag.Usage = func() {
+		fmt.Printf("Usage: %s [-config path]\n\n", os.Args[0])
+		fmt.Println("squirrel reads its settings from a YAML config file (default: squirrel.yaml).")
 		fmt.Println("")
-		fmt.Println("- schema: Path to the SQL schema you wish to parse (e.g. schema.sql)")
-		fmt.Println("- dest: Path to write the resulting Go-to-SQL layer to (e.g. db.go)")
-		fmt.Println("- pkg: Package name to use in the resulting Go code (e.g. db)")
-		fmt.Println("- ignored_tables: Optional list of tables to ignore with spaces between each table (e.g. goose users).")
+		fmt.Println("Example squirrel.yaml:")
+		fmt.Println("  schema: schema.sql      # Path to the SQL schema to parse (required)")
+		fmt.Println("  dest: db.go             # Path to write the generated Go to (required)")
+		fmt.Println("  package: db             # Package name for the generated Go (required)")
+		fmt.Println("  ignore_tables:          # Tables to parse but exclude from the generated Go")
+		fmt.Println("    - goose_db_version")
+		fmt.Println("  ctx_only: true          # Only emit context-aware DB methods (default: true)")
 		fmt.Println("")
-		fmt.Printf("Version: %s\n", versioninfo.Version)
-		fmt.Printf("Revision: %s\n", versioninfo.Revision)
-		if versioninfo.DirtyBuild { // Don't print this for tagged/released versions
-			fmt.Printf("Dirty: %v\n", versioninfo.DirtyBuild)
-		}
-		fmt.Printf("Built On: %s\n", versioninfo.LastCommit)
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	if *showVersion {
+		printVersion()
 		return
 	}
-	schema := os.Args[1]
-	output := os.Args[2]
-	pkgName := os.Args[3]
-	ctxOnly := true // Only provide context-aware versions of DB methods in interface
-	ignoredTables := []string{}
-	for i := 4; i < len(os.Args); i++ {
-		ignoredTables = append(ignoredTables, os.Args[i])
+
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Println(err)
+		flag.Usage()
+		os.Exit(1)
 	}
-	err := GenerateGoFromSQL(schema, output, pkgName, ignoredTables, ctxOnly)
+	if err := cfg.Validate(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	err = GenerateGoFromSQL(cfg.Schema, cfg.Dest, cfg.Package, cfg.IgnoreTables, cfg.CtxOnly)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1) // Return an error code so the caller knows we failed.
