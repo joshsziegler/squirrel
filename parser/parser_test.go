@@ -95,6 +95,26 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			"quoted column names",
+			`CREATE TABLE widgets (
+				"id"    INTEGER NOT NULL PRIMARY KEY,
+				"total" INTEGER NOT NULL,
+				"label" TEXT NOT NULL
+			);`,
+			false,
+			[]*Table{
+				{
+					sqlName: "widgets",
+					goName:  "Widget",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "total", goName: "Total", Type: INT, Nullable: false},
+						{sqlName: "label", goName: "Label", Type: TEXT, Nullable: false},
+					},
+				},
+			},
+		},
+		{
 			"bugs due to spacing between comment delimiter and comment text",
 			`CREATE TABLE comments (
 				foo TEXT, --no space between delimiter and first word
@@ -658,6 +678,35 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
 						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnUpdate: NoAction, OnDelete: Restrict}},
+					},
+				},
+			},
+		},
+		{
+			"table-level Foreign Key clause with quoted column names",
+			`CREATE TABLE artist (
+				name	TEXT NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE track (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				artist	TEXT NOT NULL,
+				FOREIGN KEY ("artist") REFERENCES artist ("name") ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "artist",
+					goName:  "Artist",
+					Columns: []Column{
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "track",
+					goName:  "Track",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "artist", goName: "Artist", Type: TEXT, Nullable: false, ForeignKey: &ForeignKey{Table: "artist", Column: "name", OnDelete: Cascade}},
 					},
 				},
 			},

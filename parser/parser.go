@@ -525,7 +525,7 @@ func parseColumnList(tokens *Tokens) []string {
 		} else if t == "," { // Column Separator
 			tokens.Take()
 		} else { // Column Name
-			cols = append(cols, tokens.Take())
+			cols = append(cols, removeQuotes(tokens.Take()))
 		}
 		t = tokens.Next()
 	}
