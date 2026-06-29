@@ -30,7 +30,7 @@ package: db               # Package name for the generated Go (required)
 ignore_tables:            # Tables to parse but exclude from the generated Go
   - goose_db_version
   - users
-ctx_only: true            # Only emit context-aware DB methods (default: true)
+ctx_only: true            # Only emit context-aware DB methods (optional, default: true)
 ```
 
 # Developing

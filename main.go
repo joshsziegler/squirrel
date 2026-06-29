@@ -67,6 +67,9 @@ func main() {
 	showVersion := flag.Bool("version", false, "Print version information and exit")
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [-config path]\n\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Println("")
+		fmt.Println("")
 		fmt.Println("squirrel reads its settings from a YAML config file (default: squirrel.yaml).")
 		fmt.Println("")
 		fmt.Println("Example squirrel.yaml:")
@@ -77,7 +80,6 @@ func main() {
 		fmt.Println("    - goose_db_version")
 		fmt.Println("  ctx_only: true          # Only emit context-aware DB methods (default: true)")
 		fmt.Println("")
-		flag.PrintDefaults()
 	}
 	flag.Parse()
 
