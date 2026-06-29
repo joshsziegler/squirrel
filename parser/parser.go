@@ -16,7 +16,7 @@ func Parse(sql string) ([]*Table, error) {
 	tables := make([]*Table, 0)
 	for {
 		switch {
-		case tokens.Next() == "\n":
+		case tokens.NextType() == Comment: // Comment between statements; discarded.
 			tokens.Take()
 		case tokens.Next() == "": // End of SQL
 			return tables, nil
@@ -52,16 +52,6 @@ func printContext(tokens *Tokens, err error) {
 	fmt.Println("...")
 }
 
-func removeNewlines(tokens *Tokens) {
-	for {
-		if tokens.Next() == "\n" {
-			tokens.Take()
-			continue
-		}
-		return
-	}
-}
-
 // removeQuotes surrounding the provided string -- both single and double quotes -- but only if they match.
 func removeQuotes(s string) string {
 	l := len(s)
@@ -74,26 +64,26 @@ func removeQuotes(s string) string {
 	return s
 }
 
-// parseComment removes the quote starting with the first token, or returns as-is.
+// parseComment consumes and returns the next token's text if it is a comment, or "" otherwise.
+// The lexer scans -- line and /* block */ comments into a single Comment token, so the comment
+// text is already assembled here.
 //
 // SQLite Docs: https://www.sqlite.org/lang_comment.html
-//
-// TODO: Handle multi-line comments.
-// TODO: Handle comments anywhere whitespace may occur, per the SQLite specification.
 func parseComment(tokens *Tokens) string {
-	comment := make([]string, 0)
-	if tokens.Next() == "--" {
-		tokens.Take()
-		for {
-			t := tokens.Next()
-			if t == "\n" {
-				break
-			}
-			comment = append(comment, t)
-			tokens.Take() // Consume token as part of comment
-		}
+	if tokens.NextType() == Comment {
+		return tokens.Take()
 	}
-	return strings.Join(comment, " ")
+	return ""
+}
+
+// parseInlineComment consumes and returns a trailing comment on the SAME line (no newline before
+// it), or "" otherwise. Used so a comment on its own line is not mistaken for the previous
+// definition's trailing comment.
+func parseInlineComment(tokens *Tokens) string {
+	if tokens.NextType() == Comment && !tokens.NextNewlineBefore() {
+		return tokens.Take()
+	}
+	return ""
 }
 
 // parseCreateTable
@@ -139,11 +129,15 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 	if tokens.Next() == "(" {
 		tokens.Take()
 	}
-	// Comments
-	t.Comment = parseComment(tokens)
+	// Trailing comment on the CREATE TABLE ( line itself.
+	t.Comment = parseInlineComment(tokens)
 
 	// Column(s)
 	for {
+		if tokens.NextType() == Comment { // Standalone comment between definitions; discarded.
+			parseComment(tokens)
+			continue
+		}
 		switch tokens.Next() {
 		case ")": // End of Table Definition
 			tokens.Take()
@@ -153,12 +147,8 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 			return t, nil
 		case "": // Table wasn't closed properly or something went wrong
 			return nil, fmt.Errorf("ran out of tokens unexpectedly - table was likely not closed properly")
-		case "\n": // Newline
-			tokens.Take()
 		case ",":
 			tokens.Take()
-		case "--": // Comment
-			parseComment(tokens)
 		case "CONSTRAINT": // Named table constraint
 			parseTableConstraint(tokens, t)
 		case "PRIMARY": // table-constraint
@@ -208,15 +198,11 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 		token := tokens.Next()
 		if token == "," { // End of Column Definition (check for optional comment)
 			tokens.Take()
-			if tokens.Next() == "--" {
-				c.Comment = parseComment(tokens)
-			}
+			c.Comment = parseInlineComment(tokens)
 			break
 		} else if token == ")" { // End of table definition. DO NOT CONSUME TOKEN
 			break
-		} else if token == "\n" {
-			tokens.Take()
-		} else if token == "--" {
+		} else if tokens.NextType() == Comment {
 			c.Comment = parseComment(tokens)
 		} else if token == "NOT" {
 			if tokens.NextN(2) != "NOT NULL" {
@@ -378,7 +364,6 @@ func parseForeignKeyClause(tokens *Tokens) (*ForeignKey, error) {
 	if len(fk.LocalColumns) == 0 {
 		return nil, fmt.Errorf("foreign key clause must specify at least one column")
 	}
-	removeNewlines(tokens)
 	if tokens.Take() != "REFERENCES" {
 		tokens.Return()
 		return nil, fmt.Errorf("foreign key clause must contain 'REFERENCES table-name', not %s", tokens.NextN(2))
@@ -574,8 +559,6 @@ func parseCreateIndex(tokens *Tokens) error {
 		token = tokens.Take()
 		if token == ";" {
 			break // Found end of index
-		} else if token == "\n" {
-			// Ignore new lines
 		} else if token == "" {
 			// Provide up to five tokens of context to avoid printing a huge amount of SQL
 			partialValue := ""

@@ -149,8 +149,7 @@ func TestParse(t *testing.T) {
 					Columns: []Column{
 						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false, Unique: true, Comment: "name of the bar"},
 						{sqlName: "open", goName: "Open", Type: INT, PrimaryKey: false, Nullable: true, Unique: false},
-						// FIXME: Lexer/Parser turns this comment from "(1-24)" to "( 1-24 )"
-						{sqlName: "close", goName: "Close", Type: INT, PrimaryKey: false, Nullable: true, Unique: false, Comment: "Hour ( 1-24 ) the bar closes if known"},
+						{sqlName: "close", goName: "Close", Type: INT, PrimaryKey: false, Nullable: true, Unique: false, Comment: "Hour (1-24) the bar closes if known"},
 					},
 				},
 			},
