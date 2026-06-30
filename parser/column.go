@@ -21,6 +21,7 @@ type Column struct {
 	// TODO: Handle expressions
 	DefaultString sql.NullString
 	DefaultInt    sql.NullInt64
+	DefaultFloat  sql.NullFloat64
 	DefaultBool   sql.NullBool
 }
 

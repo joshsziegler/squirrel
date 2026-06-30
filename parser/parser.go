@@ -64,6 +64,18 @@ func removeQuotes(s string) string {
 	return s
 }
 
+// takeSignedNumber consumes an optional leading '+'/'-' sign followed by the next token, returning
+// them joined (e.g. "-100", "+2.5e3"). SQLite's DEFAULT clause allows a signed-number literal, and
+// the lexer emits the sign as a separate Operator token, so this reassembles it. If the next token
+// is not a sign, the single next token is returned unchanged (so callers can still detect NULL).
+func takeSignedNumber(tokens *Tokens) string {
+	sign := ""
+	if tokens.Next() == "+" || tokens.Next() == "-" {
+		sign = tokens.Take()
+	}
+	return sign + tokens.Take()
+}
+
 // parseComment consumes and returns the next token's text if it is a comment, or "" otherwise.
 // The lexer scans -- line and /* block */ comments into a single Comment token, so the comment
 // text is already assembled here.
@@ -231,13 +243,22 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, error) {
 			tokens.Take()
 			switch c.Type {
 			case INT:
-				token := tokens.Take()
+				token := takeSignedNumber(tokens)
 				if !strings.EqualFold(token, "NULL") { // TODO: How to mark explicitly as DEFAULTS TO NULL?
 					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
 					if err != nil {
 						return c, nil, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
 					}
 					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
+				}
+			case FLOAT:
+				token := takeSignedNumber(tokens)
+				if !strings.EqualFold(token, "NULL") {
+					val, err := strconv.ParseFloat(token, 64)
+					if err != nil {
+						return c, nil, fmt.Errorf("default value for REAL/FLOAT must be a valid number or NULL, not %s", token)
+					}
+					c.DefaultFloat = sql.NullFloat64{Valid: true, Float64: val}
 				}
 			case TEXT:
 				token := tokens.Take()

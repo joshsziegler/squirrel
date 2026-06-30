@@ -186,6 +186,8 @@ func columnToGo(w *ShortWriter, c *parser.Column, t *parser.Table) {
 		commentParts = append(commentParts, fmt.Sprintf("Default: %v", c.DefaultString.String))
 	case c.DefaultInt.Valid:
 		commentParts = append(commentParts, fmt.Sprintf("Default: %v", c.DefaultInt.Int64))
+	case c.DefaultFloat.Valid:
+		commentParts = append(commentParts, fmt.Sprintf("Default: %v", c.DefaultFloat.Float64))
 	}
 	if c.Comment != "" {
 		commentParts = append(commentParts, c.Comment)

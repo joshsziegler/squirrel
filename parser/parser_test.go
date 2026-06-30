@@ -1085,6 +1085,60 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"signed integer DEFAULT values (negative, explicit positive, plain, zero)",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				balance	INTEGER NOT NULL DEFAULT -100,
+				bonus	INTEGER DEFAULT +5,
+				plain	INTEGER DEFAULT 7,
+				zero	INTEGER DEFAULT 0,
+				nodefault INTEGER DEFAULT NULL
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "balance", goName: "Balance", Type: INT, Nullable: false, DefaultInt: sql.NullInt64{Valid: true, Int64: -100}},
+						{sqlName: "bonus", goName: "Bonus", Type: INT, Nullable: true, DefaultInt: sql.NullInt64{Valid: true, Int64: 5}},
+						{sqlName: "plain", goName: "Plain", Type: INT, Nullable: true, DefaultInt: sql.NullInt64{Valid: true, Int64: 7}},
+						{sqlName: "zero", goName: "Zero", Type: INT, Nullable: true, DefaultInt: sql.NullInt64{Valid: true, Int64: 0}},
+						{sqlName: "nodefault", goName: "Nodefault", Type: INT, Nullable: true},
+					},
+				},
+			},
+		},
+		{
+			"signed REAL/FLOAT DEFAULT values (negative, explicit positive, plain, scientific)",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				temp	REAL NOT NULL DEFAULT -1.5,
+				gain	REAL DEFAULT +2.5,
+				ratio	REAL DEFAULT 0.25,
+				scaled	REAL DEFAULT -2.5e3,
+				whole	REAL DEFAULT 4,
+				nodefault REAL DEFAULT NULL
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "temp", goName: "Temp", Type: FLOAT, Nullable: false, DefaultFloat: sql.NullFloat64{Valid: true, Float64: -1.5}},
+						{sqlName: "gain", goName: "Gain", Type: FLOAT, Nullable: true, DefaultFloat: sql.NullFloat64{Valid: true, Float64: 2.5}},
+						{sqlName: "ratio", goName: "Ratio", Type: FLOAT, Nullable: true, DefaultFloat: sql.NullFloat64{Valid: true, Float64: 0.25}},
+						{sqlName: "scaled", goName: "Scaled", Type: FLOAT, Nullable: true, DefaultFloat: sql.NullFloat64{Valid: true, Float64: -2500}},
+						{sqlName: "whole", goName: "Whole", Type: FLOAT, Nullable: true, DefaultFloat: sql.NullFloat64{Valid: true, Float64: 4}},
+						{sqlName: "nodefault", goName: "Nodefault", Type: FLOAT, Nullable: true},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
