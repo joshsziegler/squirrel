@@ -121,6 +121,42 @@ func Table(w *ShortWriter, t *parser.Table) {
 	if t.Comment != "" {
 		w.F("// Schema Comment: %s\n", t.Comment)
 	}
+	// Composite PKs, multi-column UNIQUE constraints, and composite FKs are listed here (their
+	// single-column counterparts surface on the column itself) so the comment can name every column
+	// involved, plus the constraint name if it has one.
+	if pks := t.PrimaryKeys(); len(pks) > 1 {
+		cols := make([]string, len(pks))
+		for i, pk := range pks {
+			cols[i] = pk.SQLName()
+		}
+		if t.PrimaryKeyName != "" {
+			w.F("// Composite PK %s: %s\n", t.PrimaryKeyName, strings.Join(cols, ", "))
+		} else {
+			w.F("// Composite PK: %s\n", strings.Join(cols, ", "))
+		}
+	}
+	for _, uc := range t.UniqueConstraints {
+		if len(uc.Columns) < 2 {
+			continue
+		}
+		if uc.Name != "" {
+			w.F("// Composite Unique %s: %s\n", uc.Name, strings.Join(uc.Columns, ", "))
+		} else {
+			w.F("// Composite Unique: %s\n", strings.Join(uc.Columns, ", "))
+		}
+	}
+	for _, fk := range t.ForeignKeys {
+		if !fk.Composite() {
+			continue
+		}
+		local := strings.Join(fk.LocalColumns, ", ")
+		referenced := strings.Join(fk.Columns, ", ")
+		if fk.Name != "" {
+			w.F("// Composite FK %s: (%s) -> %s (%s)\n", fk.Name, local, fk.Table, referenced)
+		} else {
+			w.F("// Composite FK: (%s) -> %s (%s)\n", local, fk.Table, referenced)
+		}
+	}
 	if len(t.PrimaryKeys()) < 1 {
 		w.N("//")
 		w.N("// Update, Save, Upsert, and Delete methods not provided because we were unable to determine a PK")
@@ -159,31 +195,22 @@ func columnToGo(w *ShortWriter, c *parser.Column, t *parser.Table) {
 	if c.PrimaryKey {
 		commentParts = append(commentParts, "PK")
 	}
-	if c.CompositePrimaryKey {
-		commentParts = append(commentParts, "Composite PK")
-	}
 	if t.SingleColumnUnique(c.SQLName()) {
 		commentParts = append(commentParts, "Unique")
 	}
-	for _, uc := range t.UniqueConstraints {
-		// Single-column constraints already surface via the "Unique" tag above.
-		if len(uc.Columns) > 1 && slices.Contains(uc.Columns, c.SQLName()) {
-			commentParts = append(commentParts, "Composite Unique")
-			break
-		}
-	}
-	// Foreign keys are stored on the table; surface any that include this column, pairing it with
-	// the referenced column at the same position.
+	// Composite PKs, multi-column UNIQUE constraints, and composite FKs are NOT surfaced here
+	// because a single column's comment cannot identify all the columns involved; they are emitted
+	// at the struct level instead. Single-column foreign keys are stored on the table, so surface
+	// any that include this column, pairing it with the referenced column at the same position.
 	for _, fk := range t.ForeignKeys {
+		if fk.Composite() {
+			continue
+		}
 		for i, local := range fk.LocalColumns {
 			if local != c.SQLName() {
 				continue
 			}
-			label := "FK"
-			if fk.Composite() {
-				label = "Composite FK"
-			}
-			commentParts = append(commentParts, fmt.Sprintf("%s: %s.%s", label, fk.Table, fk.Columns[i]))
+			commentParts = append(commentParts, fmt.Sprintf("FK: %s.%s", fk.Table, fk.Columns[i]))
 		}
 	}
 	switch {
