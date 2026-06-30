@@ -42,8 +42,7 @@ Please run `make pre-commit` before committing and especially before creating me
 
 - [ ] Defaults using expressions, such as `(datetime('now'))` or `(-5)`
 - [ ] Indices
-- [ ] Check constraints (e.g. `CHECK( type IN ('special', 'user-defined'))`)
-- [ ] Retain names on `PRIMARY KEY`, `FOREIGN KEY`, and `CHECK` constraints (currently dropped)
+- [ ] Column-level CHECK constraints, and using CHECK expressions in generation (table-level CHECK constraints are now parsed and captured)
 - [ ] Named inline column constraints (e.g. `email TEXT CONSTRAINT uc_email UNIQUE`); inline `UNIQUE` is currently always unnamed
 - [ ] Add support for DB-provided timestamps such as `created_at`, `updated_at`, and `deleted_at`
 - [ ] Triggers
@@ -59,6 +58,7 @@ Please run `make pre-commit` before committing and especially before creating me
 - [x] Signed numeric defaults and REAL/FLOAT defaults (e.g. `DEFAULT -100`, `DEFAULT +5`, `DEFAULT -1.5`, `DEFAULT 2.5e3`)
 - [x] Multi-column `Unique` constraints (e.g. `UNIQUE (a, b)`)
 - [x] Named UNIQUE constraints (e.g. `CONSTRAINT uc_owner_channel UNIQUE (fk_owner_id, fk_channel_id)`)
+- [x] Retain names on table-level `PRIMARY KEY`, `FOREIGN KEY`, and `CHECK` constraints
 - [x] Foreign key clauses spanning multiple lines (the `ON`, `MATCH`, and `DEFERRABLE` clauses may now wrap across lines)
 - [x] Multi-column (composite) foreign keys (e.g. `FOREIGN KEY (a, b) REFERENCES t (x, y)`)
 - [x] Alternative identifier quoting: `[name]` and `` `name` ``

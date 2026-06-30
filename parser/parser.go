@@ -515,7 +515,7 @@ func parseTableConstraint(tokens *Tokens, table *Table) error {
 	switch {
 	case tokens.KeywordSeq("PRIMARY", "KEY"): // table-constraint
 		tokens.TakeN(2) // PRIMARY KEY
-		// TODO: Retain the constraint name for primary keys.
+		table.PrimaryKeyName = name
 		table.SetPrimaryKeys(parseIndexedColumn(tokens))
 		// TODO: Handle conflict clause
 	case tokens.KeywordIs("UNIQUE"): // table-constraint
@@ -525,13 +525,14 @@ func parseTableConstraint(tokens *Tokens, table *Table) error {
 			return err
 		}
 	case tokens.KeywordIs("CHECK"): // table-constraint
-		parseCheckConstraint(tokens)
+		table.CheckConstraints = append(table.CheckConstraints, CheckConstraint{Name: name, Expr: parseCheckConstraint(tokens)})
 	case tokens.KeywordSeq("FOREIGN", "KEY"): // table-constraint
 		tokens.TakeN(2)
 		fk, err := parseForeignKeyClause(tokens)
 		if err != nil {
 			return err
 		}
+		fk.Name = name
 		if err := table.AddForeignKey(fk); err != nil {
 			return err
 		}
@@ -600,25 +601,33 @@ func parseCreateIndex(tokens *Tokens) error {
 
 // parseCheckConstraint: CHECK ( expr )
 // See column-constraint and table-constraint
-func parseCheckConstraint(tokens *Tokens) {
-	tokens.Take()
+// parseCheckConstraint parses a CHECK ( expr ) constraint, returning the expression as a
+// space-normalized token string (best-effort; nested parentheses are preserved but the outer pair
+// is not). The leading CHECK keyword is consumed.
+func parseCheckConstraint(tokens *Tokens) string {
+	tokens.Take() // CHECK
+	if tokens.Next() != "(" {
+		return "" // malformed; nothing to capture
+	}
+	tokens.Take() // opening parenthesis
 	value := []string{}
-	paren := 0
-	for {
-		t := tokens.Next()
-		if t == "(" {
-			tokens.Take()
-			paren += 1
-		} else if t == ")" {
-			tokens.Take()
-			paren -= 1
-			if paren < 1 {
-				break // End of CHECK EXPRESSION
+	paren := 1
+	for paren > 0 {
+		t := tokens.Take()
+		switch t {
+		case "":
+			return strings.Join(value, " ") // ran out of tokens
+		case "(":
+			paren++
+			value = append(value, t)
+		case ")":
+			paren--
+			if paren > 0 {
+				value = append(value, t)
 			}
-		} else {
-			// Unsupported token
-			value = append(value, tokens.Take())
+		default:
+			value = append(value, t)
 		}
 	}
-	log.Debugf("[IGNORED] CHECK constraint: %s", strings.Join(value, " "))
+	return strings.Join(value, " ")
 }

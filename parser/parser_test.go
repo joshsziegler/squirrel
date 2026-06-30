@@ -373,6 +373,7 @@ func TestParse(t *testing.T) {
 						{sqlName: "album_title", goName: "AlbumTitle", Type: TEXT, PrimaryKey: false, CompositePrimaryKey: true, Nullable: false},
 						{sqlName: "year", goName: "Year", Type: INT, PrimaryKey: false, Nullable: false},
 					},
+					PrimaryKeyName: "author_book",
 				},
 			},
 		},
@@ -1233,6 +1234,64 @@ func TestParse(t *testing.T) {
 						{sqlName: "scaled", goName: "Scaled", Type: FLOAT, Nullable: true, DefaultFloat: sql.NullFloat64{Valid: true, Float64: -2500}},
 						{sqlName: "whole", goName: "Whole", Type: FLOAT, Nullable: true, DefaultFloat: sql.NullFloat64{Valid: true, Float64: 4}},
 						{sqlName: "nodefault", goName: "Nodefault", Type: FLOAT, Nullable: true},
+					},
+				},
+			},
+		},
+		{
+			"named table-level FOREIGN KEY retains its name",
+			`CREATE TABLE parents (
+				id	INTEGER NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE children (
+				id			INTEGER NOT NULL PRIMARY KEY,
+				parent_id	INTEGER NOT NULL,
+				CONSTRAINT fk_parent FOREIGN KEY (parent_id) REFERENCES parents (id) ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "children",
+					goName:  "Child",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: false},
+					},
+					ForeignKeys: []*ForeignKey{
+						{Name: "fk_parent", Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"named and unnamed table-level CHECK constraints",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				age		INTEGER NOT NULL,
+				score	INTEGER NOT NULL,
+				CONSTRAINT ck_age CHECK (age >= 0),
+				CHECK (score > age)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "age", goName: "Age", Type: INT, Nullable: false},
+						{sqlName: "score", goName: "Score", Type: INT, Nullable: false},
+					},
+					CheckConstraints: []CheckConstraint{
+						{Name: "ck_age", Expr: "age >= 0"},
+						{Name: "", Expr: "score > age"},
 					},
 				},
 			},

@@ -32,6 +32,7 @@ func (a OnFkAction) String() string {
 // are stored on the Table rather than on individual Columns. LocalColumns and Columns are paired
 // positionally: LocalColumns[i] in this table references Columns[i] in the foreign Table.
 type ForeignKey struct {
+	Name         string     // Name from a CONSTRAINT <name> prefix (table-level only), or "" if unnamed.
 	Table        string     // Table is the referenced (foreign) table.
 	LocalColumns []string   // LocalColumns are the column(s) in THIS table, in order.
 	Columns      []string   // Columns are the referenced column(s) in Table, paired positionally with LocalColumns.

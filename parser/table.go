@@ -20,13 +20,24 @@ type Table struct {
 	// column or as a table-level constraint, and whether single- or multi-column. Use
 	// SingleColumnUnique to test individual-column uniqueness.
 	UniqueConstraints []UniqueConstraint
-	Comment           string // Comment at the end of the CREATE TABLE definition if provided.
+	// PrimaryKeyName is the name from a table-level CONSTRAINT <name> PRIMARY KEY (...), or "" if
+	// the primary key is unnamed or declared inline on a column.
+	PrimaryKeyName string
+	// CheckConstraints holds table-level CHECK constraints, in declaration order.
+	CheckConstraints []CheckConstraint
+	Comment          string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
 // UniqueConstraint is a table-level UNIQUE constraint over one or more columns.
 type UniqueConstraint struct {
 	Name    string   // Name from a CONSTRAINT <name> prefix, or "" if unnamed.
 	Columns []string // The constrained columns, in the order declared.
+}
+
+// CheckConstraint is a table-level CHECK constraint.
+type CheckConstraint struct {
+	Name string // Name from a CONSTRAINT <name> prefix, or "" if unnamed.
+	Expr string // The check expression as a space-normalized token string (best-effort).
 }
 
 func (t *Table) GoName() string  { return t.goName }
