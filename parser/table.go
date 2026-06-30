@@ -16,7 +16,10 @@ type Table struct {
 	IfNotExists bool
 	Columns     []Column
 	ForeignKeys []*ForeignKey // ForeignKeys defined on this table (inline single-column and table-level, possibly composite).
-	Comment     string        // Comment at the end of the CREATE TABLE definition if provided.
+	// UniqueConstraints holds multi-column UNIQUE constraints, each as an ordered list of column
+	// names. Single-column UNIQUE constraints are recorded on the column itself (Column.Unique).
+	UniqueConstraints [][]string
+	Comment           string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
 func (t *Table) GoName() string  { return t.goName }
@@ -78,6 +81,30 @@ func (t *Table) AddForeignKey(fk *ForeignKey) error {
 		}
 	}
 	t.ForeignKeys = append(t.ForeignKeys, fk)
+	return nil
+}
+
+// AddUniqueConstraint records a table-level UNIQUE constraint. Every named column MUST be defined
+// by the time this is called. A single-column constraint sets that column's Unique flag (equivalent
+// to an inline UNIQUE); a multi-column constraint is appended to UniqueConstraints.
+func (t *Table) AddUniqueConstraint(colNames []string) error {
+	if len(colNames) < 1 {
+		return fmt.Errorf("UNIQUE constraint must name at least one column")
+	}
+	for _, colName := range colNames {
+		if !t.hasColumn(colName) {
+			return fmt.Errorf("UNIQUE constraint references unknown column %q", colName)
+		}
+	}
+	if len(colNames) == 1 {
+		for i := range t.Columns {
+			if t.Columns[i].SQLName() == colNames[0] {
+				t.Columns[i].Unique = true
+			}
+		}
+		return nil
+	}
+	t.UniqueConstraints = append(t.UniqueConstraints, colNames)
 	return nil
 }
 

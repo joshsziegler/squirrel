@@ -80,28 +80,3 @@ func UpsertUpdateColumns(t *parser.Table) string {
 	}
 	return strings.Join(cols, ", ")
 }
-
-// UpsertConflictColumns returns the column list for an UPSERT's ON CONFLICT clause.
-//
-// From the SQLite Docs:
-//
-//	The UPSERT processing happens only for uniqueness constraints. A "uniqueness constraint" is an
-//	explicit UNIQUE or PRIMARY KEY constraint within the CREATE TABLE statement, or a unique
-//	index. UPSERT does not intervene for failed NOT NULL, CHECK, or foreign key constraints or for
-//	constraints that are implemented using triggers.
-//		~ https://www.sqlite.org/lang_upsert.html
-func UpsertConflictColumns(t *parser.Table) string {
-	cols := []string{}
-	pks := t.PrimaryKeys()
-	for _, col := range pks {
-		if !col.AutoIncrement() { // Do not include auto-incrementing columns (e.g. rowid)
-			cols = append(cols, col.SQLName())
-		}
-	}
-	for _, col := range t.Columns {
-		if col.Unique {
-			cols = append(cols, col.SQLName())
-		}
-	}
-	return strings.Join(cols, ", ")
-}

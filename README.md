@@ -43,7 +43,7 @@ Please run `make pre-commit` before committing and especially before creating me
 - [x] Signed numeric defaults and REAL/FLOAT defaults (e.g. `DEFAULT -100`, `DEFAULT +5`, `DEFAULT -1.5`, `DEFAULT 2.5e3`)
 - [ ] Defaults using expressions, such as `(datetime('now'))` or `(-5)`
 - [ ] Indices
-- [ ] Multi-column `Unique` constraints
+- [x] Multi-column `Unique` constraints (e.g. `UNIQUE (a, b)`)
 - [ ] Check constraints (e.g. `CHECK( type IN ('special', 'user-defined'))`)
 - [ ] Named constraints (e.g. `CONSTRAINT uc_owner_channel UNIQUE (fk_owner_id, fk_channel_id)`)
 - [ ] Add support for DB-provided timestamps such as `created_at`, `updated_at`, and `deleted_at`

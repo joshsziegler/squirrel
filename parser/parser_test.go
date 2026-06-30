@@ -389,6 +389,51 @@ func TestParse(t *testing.T) {
 						{sqlName: "server", goName: "Server", Type: INT, PrimaryKey: false, Nullable: false},
 						{sqlName: "character_name", goName: "CharacterName", Type: TEXT, PrimaryKey: false, Nullable: false},
 					},
+					UniqueConstraints: [][]string{{"server", "character_name"}},
+				},
+			},
+		},
+		{
+			"single-column table-level UNIQUE sets the column's Unique flag",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				email	TEXT NOT NULL,
+				UNIQUE (email)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "email", goName: "Email", Type: TEXT, Nullable: false, Unique: true},
+					},
+				},
+			},
+		},
+		{
+			"multiple UNIQUE constraints, single- and multi-column",
+			`CREATE TABLE memberships (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				org_id	INTEGER NOT NULL,
+				user_id	INTEGER NOT NULL,
+				slug	TEXT NOT NULL,
+				UNIQUE (slug),
+				UNIQUE (org_id, user_id)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "memberships",
+					goName:  "Membership",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "org_id", goName: "OrgID", Type: INT, Nullable: false},
+						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false},
+						{sqlName: "slug", goName: "Slug", Type: TEXT, Nullable: false, Unique: true},
+					},
+					UniqueConstraints: [][]string{{"org_id", "user_id"}},
 				},
 			},
 		},

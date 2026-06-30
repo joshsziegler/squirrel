@@ -165,6 +165,12 @@ func columnToGo(w *ShortWriter, c *parser.Column, t *parser.Table) {
 	if c.Unique {
 		commentParts = append(commentParts, "Unique")
 	}
+	for _, uc := range t.UniqueConstraints {
+		if slices.Contains(uc, c.SQLName()) {
+			commentParts = append(commentParts, "Composite Unique")
+			break
+		}
+	}
 	// Foreign keys are stored on the table; surface any that include this column, pairing it with
 	// the referenced column at the same position.
 	for _, fk := range t.ForeignKeys {
