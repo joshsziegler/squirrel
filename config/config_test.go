@@ -26,6 +26,9 @@ ignore_tables:
   - goose_db_version
   - users
 ctx_only: true
+acronyms:
+  dns: DNS
+  oauth: OAuth
 `)
 	cfg, err := Load(path)
 	require.NoError(t, err)
@@ -34,6 +37,7 @@ ctx_only: true
 	assert.Equal(t, "db", cfg.Package)
 	assert.Equal(t, []string{"goose_db_version", "users"}, cfg.IgnoreTables)
 	assert.True(t, cfg.CtxOnly)
+	assert.Equal(t, map[string]string{"dns": "DNS", "oauth": "OAuth"}, cfg.Acronyms)
 }
 
 func TestLoad_CtxOnlyDefaultsTrue(t *testing.T) {

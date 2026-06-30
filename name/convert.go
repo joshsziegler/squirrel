@@ -26,6 +26,17 @@ var (
 	}
 )
 
+// RegisterAcronyms merges the provided acronyms into the set that ToGo keeps
+// uppercase (and does not singularize) when converting SQL names to Go names.
+// Keys are matched case-insensitively against each underscore-separated word;
+// the value is emitted verbatim, so callers control the exact Go casing (e.g.
+// "oauth" -> "OAuth"). User-provided entries override the built-in defaults.
+func RegisterAcronyms(m map[string]string) {
+	for k, v := range m {
+		acronyms[strings.ToLower(k)] = v
+	}
+}
+
 // ToGo converts a snake_case name to CamelCase -- per Go conventions -- and singularizes it.
 func ToGo(s string) string {
 	s = strings.ToLower(s) // Convert to lowercase to match against acronyms
