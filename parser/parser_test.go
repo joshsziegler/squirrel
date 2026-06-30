@@ -389,7 +389,7 @@ func TestParse(t *testing.T) {
 						{sqlName: "server", goName: "Server", Type: INT, PrimaryKey: false, Nullable: false},
 						{sqlName: "character_name", goName: "CharacterName", Type: TEXT, PrimaryKey: false, Nullable: false},
 					},
-					UniqueConstraints: [][]string{{"server", "character_name"}},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"server", "character_name"}}},
 				},
 			},
 		},
@@ -433,7 +433,29 @@ func TestParse(t *testing.T) {
 						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false},
 						{sqlName: "slug", goName: "Slug", Type: TEXT, Nullable: false, Unique: true},
 					},
-					UniqueConstraints: [][]string{{"org_id", "user_id"}},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"org_id", "user_id"}}},
+				},
+			},
+		},
+		{
+			"named multi-column UNIQUE constraint retains its name",
+			`CREATE TABLE memberships (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				org_id	INTEGER NOT NULL,
+				user_id	INTEGER NOT NULL,
+				CONSTRAINT uc_org_user UNIQUE (org_id, user_id)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "memberships",
+					goName:  "Membership",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "org_id", goName: "OrgID", Type: INT, Nullable: false},
+						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false},
+					},
+					UniqueConstraints: []UniqueConstraint{{Name: "uc_org_user", Columns: []string{"org_id", "user_id"}}},
 				},
 			},
 		},

@@ -499,19 +499,22 @@ func parseDatetimeDefault(tokens *Tokens) {
 // table-constraint
 // https://www.sqlite.org/syntax/table-constraint.html
 func parseTableConstraint(tokens *Tokens, table *Table) error {
+	// Optional CONSTRAINT <name> prefix that may precede any table-constraint.
+	name := ""
+	if tokens.KeywordIs("CONSTRAINT") {
+		tokens.Take()        // CONSTRAINT
+		name = tokens.Take() // constraint name
+	}
 	switch {
-	case tokens.KeywordIs("CONSTRAINT"): // Named table constraint (which is optional)
-		tokens.Take() // CONSTRAINT
-		// The constraint name is currently ignored; the loop re-dispatches on the actual constraint.
-		log.Debugf("[IGNORED] table constraint name: %s", tokens.Take())
 	case tokens.KeywordSeq("PRIMARY", "KEY"): // table-constraint
 		tokens.TakeN(2) // PRIMARY KEY
+		// TODO: Retain the constraint name for primary keys.
 		table.SetPrimaryKeys(parseIndexedColumn(tokens))
 		// TODO: Handle conflict clause
 	case tokens.KeywordIs("UNIQUE"): // table-constraint
 		tokens.Take()
 		// TODO: Handle conflict clause
-		if err := table.AddUniqueConstraint(parseIndexedColumn(tokens)); err != nil {
+		if err := table.AddUniqueConstraint(name, parseIndexedColumn(tokens)); err != nil {
 			return err
 		}
 	case tokens.KeywordIs("CHECK"): // table-constraint

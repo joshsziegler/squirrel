@@ -166,7 +166,7 @@ func columnToGo(w *ShortWriter, c *parser.Column, t *parser.Table) {
 		commentParts = append(commentParts, "Unique")
 	}
 	for _, uc := range t.UniqueConstraints {
-		if slices.Contains(uc, c.SQLName()) {
+		if slices.Contains(uc.Columns, c.SQLName()) {
 			commentParts = append(commentParts, "Composite Unique")
 			break
 		}

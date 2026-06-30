@@ -16,10 +16,16 @@ type Table struct {
 	IfNotExists bool
 	Columns     []Column
 	ForeignKeys []*ForeignKey // ForeignKeys defined on this table (inline single-column and table-level, possibly composite).
-	// UniqueConstraints holds multi-column UNIQUE constraints, each as an ordered list of column
-	// names. Single-column UNIQUE constraints are recorded on the column itself (Column.Unique).
-	UniqueConstraints [][]string
+	// UniqueConstraints holds multi-column UNIQUE constraints. Single-column UNIQUE constraints are
+	// recorded on the column itself (Column.Unique).
+	UniqueConstraints []UniqueConstraint
 	Comment           string // Comment at the end of the CREATE TABLE definition if provided.
+}
+
+// UniqueConstraint is a table-level multi-column UNIQUE constraint.
+type UniqueConstraint struct {
+	Name    string   // Name from a CONSTRAINT <name> prefix, or "" if unnamed.
+	Columns []string // The constrained columns, in the order declared.
 }
 
 func (t *Table) GoName() string  { return t.goName }
@@ -87,7 +93,7 @@ func (t *Table) AddForeignKey(fk *ForeignKey) error {
 // AddUniqueConstraint records a table-level UNIQUE constraint. Every named column MUST be defined
 // by the time this is called. A single-column constraint sets that column's Unique flag (equivalent
 // to an inline UNIQUE); a multi-column constraint is appended to UniqueConstraints.
-func (t *Table) AddUniqueConstraint(colNames []string) error {
+func (t *Table) AddUniqueConstraint(name string, colNames []string) error {
 	if len(colNames) < 1 {
 		return fmt.Errorf("UNIQUE constraint must name at least one column")
 	}
@@ -102,9 +108,11 @@ func (t *Table) AddUniqueConstraint(colNames []string) error {
 				t.Columns[i].Unique = true
 			}
 		}
+		// Single-column uniqueness is captured by the column's Unique flag; an optional constraint
+		// name is not retained for this case.
 		return nil
 	}
-	t.UniqueConstraints = append(t.UniqueConstraints, colNames)
+	t.UniqueConstraints = append(t.UniqueConstraints, UniqueConstraint{Name: name, Columns: colNames})
 	return nil
 }
 
