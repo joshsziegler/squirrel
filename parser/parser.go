@@ -166,46 +166,58 @@ func parseCreateTable(tokens *Tokens) (*Table, error) {
 			tokens.KeywordIs("CHECK"), tokens.KeywordIs("FOREIGN"):
 			parseTableConstraint(tokens, t)
 		default: // column-def
-			col, fk, unique, err := parseColumn(tokens, t.Strict)
+			pc, err := parseColumn(tokens, t.Strict)
 			if err != nil {
 				return nil, err
 			}
-			t.Columns = append(t.Columns, col)
-			if fk != nil {
-				if err := t.AddForeignKey(fk); err != nil {
+			t.Columns = append(t.Columns, pc.Column)
+			if pc.ForeignKey != nil {
+				if err := t.AddForeignKey(pc.ForeignKey); err != nil {
 					return nil, err
 				}
 			}
-			if unique != nil {
-				if err := t.AddUniqueConstraint(unique.Name, unique.Columns); err != nil {
+			if pc.Unique != nil {
+				if err := t.AddUniqueConstraint(pc.Unique.Name, pc.Unique.Columns); err != nil {
 					return nil, err
 				}
+			}
+			t.CheckConstraints = append(t.CheckConstraints, pc.Checks...)
+			if pc.PrimaryKeyName != "" {
+				t.PrimaryKeyName = pc.PrimaryKeyName
 			}
 		}
 	}
 }
 
-// parseColumn parses a single column definition. Inline constraints that are stored at the table
-// level rather than on the Column are returned for the caller to attach: a single-column foreign
-// key via REFERENCES (second value, nil if none) and an inline UNIQUE constraint (third value, nil
-// if none).
-func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, *UniqueConstraint, error) {
-	c := Column{
-		PrimaryKey: false,
-		Nullable:   true,
-	}
-	var fk *ForeignKey
-	var unique *UniqueConstraint
+// parsedColumn bundles a parsed column with the constraints that are stored at the table level
+// rather than on the Column itself, so parseColumn's caller can attach them to the table.
+type parsedColumn struct {
+	Column         Column
+	ForeignKey     *ForeignKey       // inline REFERENCES, or nil
+	Unique         *UniqueConstraint // inline UNIQUE, or nil
+	Checks         []CheckConstraint // inline CHECK constraint(s)
+	PrimaryKeyName string            // name of an inline named PRIMARY KEY, or ""
+}
+
+// parseColumn parses a single column definition, returning the column together with any inline
+// constraints that belong on the table (foreign key, unique, check, primary-key name). A
+// "CONSTRAINT <name>" prefix may precede any column constraint and names the constraint that
+// follows it.
+// SQLite Docs: https://www.sqlite.org/syntax/column-constraint.html
+func parseColumn(tokens *Tokens, strict bool) (parsedColumn, error) {
+	pc := parsedColumn{Column: Column{PrimaryKey: false, Nullable: true}}
+	c := &pc.Column
+	// constraintName holds the name from a pending "CONSTRAINT <name>" prefix; it applies to the
+	// next constraint and is cleared once consumed.
+	constraintName := ""
 
 	// Name
 	c.SetSQLName(removeQuotes(tokens.Take()))
 	// Data Type
-	err := parseColumnDataType(tokens, &c, strict)
-	if err != nil {
-		return c, nil, nil, err
+	if err := parseColumnDataType(tokens, c, strict); err != nil {
+		return pc, err
 	}
 	// Constraints
-	// SQlite Docs: https://www.sqlite.org/syntax/column-constraint.html
 	for {
 		token := tokens.Next()
 		if token == "," { // End of Column Definition (check for optional comment)
@@ -216,45 +228,57 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, *UniqueConst
 			break
 		} else if tokens.NextType() == Comment {
 			c.Comment = parseComment(tokens)
+		} else if tokens.KeywordIs("CONSTRAINT") {
+			tokens.Take()                  // CONSTRAINT
+			constraintName = tokens.Take() // names the constraint that follows
 		} else if tokens.KeywordSeq("NOT", "NULL") {
 			// TODO: Handle [conflict-clause]
 			c.Nullable = false
 			tokens.TakeN(2)
+			constraintName = "" // no model slot for a NOT NULL constraint name
 		} else if tokens.KeywordIs("NOT") {
-			return c, nil, nil, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
+			return pc, fmt.Errorf("column constraint must be 'NOT NULL', not %s", tokens.NextN(2))
 		} else if tokens.KeywordSeq("PRIMARY", "KEY") {
 			// TODO: Handle [ASC|DESC] and [conflict-clause]
 			c.PrimaryKey = true
+			pc.PrimaryKeyName = constraintName
+			constraintName = ""
 			tokens.TakeN(2)
 		} else if tokens.KeywordIs("PRIMARY") {
-			return c, nil, nil, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
+			return pc, fmt.Errorf("column constraint must be 'PRIMARY KEY', not %s", tokens.NextN(2))
 		} else if tokens.KeywordIs("AUTOINCREMENT") {
 			if c.PrimaryKey {
 				tokens.Take() // Consume ONE token
 			} else {
-				return c, nil, nil, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
+				return pc, errors.New("column constraint 'AUTOINCREMENT' must follow 'PRIMARY KEY'")
 			}
 		} else if tokens.KeywordIs("UNIQUE") {
 			// TODO: Handle [conflict-clause]
-			// Inline UNIQUE is recorded as a single-column, unnamed table-level constraint.
-			unique = &UniqueConstraint{Columns: []string{c.SQLName()}}
+			// Inline UNIQUE is recorded as a single-column table-level constraint.
+			pc.Unique = &UniqueConstraint{Name: constraintName, Columns: []string{c.SQLName()}}
+			constraintName = ""
 			tokens.Take() // Consume ONE token
 		} else if tokens.KeywordIs("REFERENCES") { // Foreign Key
-			fk, err = parseForeignKey(tokens, &c)
+			fk, err := parseForeignKey(tokens, c)
 			if err != nil {
-				return c, nil, nil, err
+				return pc, err
 			}
+			fk.Name = constraintName
+			constraintName = ""
+			pc.ForeignKey = fk
 		} else if tokens.KeywordIs("CHECK") { // CHECK column constraint
-			parseCheckConstraint(tokens)
+			pc.Checks = append(pc.Checks, CheckConstraint{Name: constraintName, Expr: parseCheckConstraint(tokens)})
+			constraintName = ""
 		} else if tokens.KeywordIs("DEFAULT") {
 			tokens.Take()
+			constraintName = "" // no model slot for a DEFAULT constraint name
 			switch c.Type {
 			case INT:
 				token := takeSignedNumber(tokens)
 				if !strings.EqualFold(token, "NULL") { // TODO: How to mark explicitly as DEFAULTS TO NULL?
 					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
 					if err != nil {
-						return c, nil, nil, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
+						return pc, fmt.Errorf("default value for INT/INTEGER must be a valid base 10 integer or NULL, not %s", token)
 					}
 					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
 				}
@@ -263,7 +287,7 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, *UniqueConst
 				if !strings.EqualFold(token, "NULL") {
 					val, err := strconv.ParseFloat(token, 64)
 					if err != nil {
-						return c, nil, nil, fmt.Errorf("default value for REAL/FLOAT must be a valid number or NULL, not %s", token)
+						return pc, fmt.Errorf("default value for REAL/FLOAT must be a valid number or NULL, not %s", token)
 					}
 					c.DefaultFloat = sql.NullFloat64{Valid: true, Float64: val}
 				}
@@ -286,19 +310,19 @@ func parseColumn(tokens *Tokens, strict bool) (Column, *ForeignKey, *UniqueConst
 				case "FALSE", "0":
 					c.DefaultBool = sql.NullBool{Valid: true, Bool: false}
 				default:
-					return c, nil, nil, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
+					return pc, fmt.Errorf("default value for BOOL/BOOLEAN must be TRUE/true/1 or FALSE/false/0, not %s", token)
 				}
 			case DATETIME:
 				parseDatetimeDefault(tokens)
 			default:
-				return c, nil, nil, fmt.Errorf("default values for %s type are not supported", c.Type)
+				return pc, fmt.Errorf("default values for %s type are not supported", c.Type)
 			}
 		} else {
-			return c, nil, nil, fmt.Errorf("unrecognized column constraint for column \"%s\" starting with: \"%s\"", c.SQLName(), tokens.NextN(5))
+			return pc, fmt.Errorf("unrecognized column constraint for column \"%s\" starting with: \"%s\"", c.SQLName(), tokens.NextN(5))
 		}
 	}
 
-	return c, fk, unique, nil
+	return pc, nil
 }
 
 // Column Type

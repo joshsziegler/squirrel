@@ -1296,6 +1296,82 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			"named column-level constraints (PRIMARY KEY, UNIQUE, CHECK, FOREIGN KEY)",
+			`CREATE TABLE parents (
+				id	INTEGER NOT NULL PRIMARY KEY
+			);
+			CREATE TABLE t (
+				id			INTEGER NOT NULL CONSTRAINT pk_t PRIMARY KEY,
+				email		TEXT CONSTRAINT uc_email UNIQUE,
+				age			INTEGER NOT NULL CONSTRAINT ck_age CHECK (age > 0),
+				parent_id	INTEGER CONSTRAINT fk_parent REFERENCES parents (id) ON DELETE CASCADE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "parents",
+					goName:  "Parent",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+					},
+				},
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "email", goName: "Email", Type: TEXT, Nullable: true},
+						{sqlName: "age", goName: "Age", Type: INT, Nullable: false},
+						{sqlName: "parent_id", goName: "ParentID", Type: INT, Nullable: true},
+					},
+					PrimaryKeyName:    "pk_t",
+					UniqueConstraints: []UniqueConstraint{{Name: "uc_email", Columns: []string{"email"}}},
+					CheckConstraints:  []CheckConstraint{{Name: "ck_age", Expr: "age > 0"}},
+					ForeignKeys: []*ForeignKey{
+						{Name: "fk_parent", Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
+					},
+				},
+			},
+		},
+		{
+			"multiple named constraints on a single column",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				email	TEXT CONSTRAINT nn NOT NULL CONSTRAINT uq UNIQUE
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "email", goName: "Email", Type: TEXT, Nullable: false},
+					},
+					UniqueConstraints: []UniqueConstraint{{Name: "uq", Columns: []string{"email"}}},
+				},
+			},
+		},
+		{
+			"unnamed column-level CHECK is captured",
+			`CREATE TABLE t (
+				id	INTEGER NOT NULL PRIMARY KEY,
+				age	INTEGER NOT NULL CHECK (age >= 18)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "age", goName: "Age", Type: INT, Nullable: false},
+					},
+					CheckConstraints: []CheckConstraint{{Name: "", Expr: "age >= 18"}},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

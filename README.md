@@ -42,8 +42,7 @@ Please run `make pre-commit` before committing and especially before creating me
 
 - [ ] Defaults using expressions, such as `(datetime('now'))` or `(-5)`
 - [ ] Indices
-- [ ] Column-level CHECK constraints, and using CHECK expressions in generation (table-level CHECK constraints are now parsed and captured)
-- [ ] Named inline column constraints (e.g. `email TEXT CONSTRAINT uc_email UNIQUE`); inline `UNIQUE` is currently always unnamed
+- [ ] Use CHECK constraint expressions in generation (CHECK constraints are now parsed and captured, but unused)
 - [ ] Add support for DB-provided timestamps such as `created_at`, `updated_at`, and `deleted_at`
 - [ ] Triggers
 - [ ] Add option to include or exclude rows that have been soft-deleted (i.e. `deleted_at`)
@@ -59,6 +58,7 @@ Please run `make pre-commit` before committing and especially before creating me
 - [x] Multi-column `Unique` constraints (e.g. `UNIQUE (a, b)`)
 - [x] Named UNIQUE constraints (e.g. `CONSTRAINT uc_owner_channel UNIQUE (fk_owner_id, fk_channel_id)`)
 - [x] Retain names on table-level `PRIMARY KEY`, `FOREIGN KEY`, and `CHECK` constraints
+- [x] Named inline column constraints (e.g. `email TEXT CONSTRAINT uc_email UNIQUE`), including column-level CHECK capture
 - [x] Foreign key clauses spanning multiple lines (the `ON`, `MATCH`, and `DEFERRABLE` clauses may now wrap across lines)
 - [x] Multi-column (composite) foreign keys (e.g. `FOREIGN KEY (a, b) REFERENCES t (x, y)`)
 - [x] Alternative identifier quoting: `[name]` and `` `name` ``
