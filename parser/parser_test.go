@@ -739,6 +739,28 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			"BUG: partial index with empty-string literal in WHERE clause",
+			`CREATE TABLE shared_services (
+				id				INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+				source			TEXT NOT NULL,
+				source_key		TEXT NOT NULL
+			);
+			CREATE UNIQUE INDEX idx_shared_services_source_key ON shared_services (source, source_key) WHERE source != '';
+			`,
+			false,
+			[]*Table{
+				{
+					sqlName: "shared_services",
+					goName:  "SharedService",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "source", goName: "Source", Type: TEXT, Nullable: false},
+						{sqlName: "source_key", goName: "SourceKey", Type: TEXT, Nullable: false},
+					},
+				},
+			},
+		},
+		{
 			"inline Foreign Key with ON DELETE/UPDATE RESTRICT and NO ACTION",
 			`CREATE TABLE parents (
 				id		INTEGER NOT NULL PRIMARY KEY,

@@ -18,7 +18,7 @@ func Parse(sql string) ([]*Table, error) {
 		switch {
 		case tokens.NextType() == Comment: // Comment between statements; discarded.
 			tokens.Take()
-		case tokens.Next() == "": // End of SQL
+		case tokens.NextType() == EOF: // End of SQL
 			return tables, nil
 		case tokens.KeywordSeq("CREATE", "TABLE"):
 			table, err := parseCreateTable(tokens)
@@ -601,12 +601,11 @@ func parseColumnList(tokens *Tokens) []string {
 func parseCreateIndex(tokens *Tokens) error {
 	// Find the closing semicolon and ignore this index (i.e. handle multiline)
 	value := []string{}
-	token := tokens.Take()
+	tokens.Take() // consume the leading CREATE
 	for {
-		token = tokens.Take()
-		if token == ";" {
-			break // Found end of index
-		} else if token == "" {
+		// Detect end of input by token type, not by an empty value: an empty value is also
+		// produced by an empty-string literal ('') such as in a partial-index "WHERE col != ''".
+		if tokens.NextType() == EOF {
 			// Provide up to five tokens of context to avoid printing a huge amount of SQL
 			partialValue := ""
 			if len(value) > 5 {
@@ -615,9 +614,12 @@ func parseCreateIndex(tokens *Tokens) error {
 				partialValue = strings.Join(value, " ")
 			}
 			return fmt.Errorf("expected closing semi-colon while parsing CREATE INDEX, but found end of SQL: %s", partialValue)
-		} else {
-			value = append(value, token)
 		}
+		token := tokens.Take()
+		if token == ";" {
+			break // Found end of index
+		}
+		value = append(value, token)
 	}
 	log.Debugf("[IGNORED] CREATE INDEX: %s", strings.Join(value, " "))
 	return nil
