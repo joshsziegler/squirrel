@@ -22,6 +22,11 @@ type Config struct {
 	// CtxOnly emits only context-aware DB methods (e.g. ExecContext) when true.
 	// Defaults to true when omitted from the config file.
 	CtxOnly bool `yaml:"ctx_only"`
+	// Acronyms maps a lowercase SQL word to the Go form that should be kept
+	// verbatim (and not singularized) when converting SQL names to Go names,
+	// e.g. {aws: AWS, dns: DNS, oauth: OAuth}. These merge with and override
+	// squirrel's built-in defaults (ID, CPU, GPU, URL, IP, ...).
+	Acronyms map[string]string `yaml:"acronyms"`
 }
 
 // Load reads and parses the YAML config file at path. Defaults are applied

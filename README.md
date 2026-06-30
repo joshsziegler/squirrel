@@ -31,7 +31,17 @@ ignore_tables:            # Tables to parse but exclude from the generated Go
   - goose_db_version
   - users
 ctx_only: true            # Only emit context-aware DB methods (optional, default: true)
+acronyms:                 # SQL word -> Go form kept uppercase and not singularized (optional)
+  dns: DNS                #   e.g. dns_zones -> DNSZone
+  ldap: LDAP
+  oauth: OAuth            #   the value is emitted verbatim, so mixed-case forms work too
 ```
+
+Squirrel already knows a handful of common acronyms (`id`, `cpu`, `gpu`, `aws`,
+`ssl`, `url`, `ip`, `pid`, `uid`, `gid`, `os`). The `acronyms` map merges with
+and overrides those defaults. Keys are matched case-insensitively against each
+underscore-separated word; without an entry a word like `dns` would be
+singularized to the incorrect `Dn`.
 
 # Developing
 

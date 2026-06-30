@@ -8,6 +8,7 @@ import (
 	"github.com/carlmjohnson/versioninfo"
 
 	"github.com/joshsziegler/squirrel/config"
+	"github.com/joshsziegler/squirrel/name"
 	"github.com/joshsziegler/squirrel/parser"
 	"github.com/joshsziegler/squirrel/templates"
 )
@@ -79,6 +80,9 @@ func main() {
 		fmt.Println("  ignore_tables:          # Tables to parse but exclude from the generated Go")
 		fmt.Println("    - goose_db_version")
 		fmt.Println("  ctx_only: true          # Only emit context-aware DB methods (default: true)")
+		fmt.Println("  acronyms:               # SQL word -> Go form kept uppercase and not singularized")
+		fmt.Println("    dns: DNS              # e.g. dns_zones -> DNSZone")
+		fmt.Println("    oauth: OAuth")
 		fmt.Println("")
 	}
 	flag.Parse()
@@ -98,6 +102,10 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// Register any user-defined acronyms so they are kept uppercase (and not
+	// singularized) when SQL names are converted to Go names during parsing.
+	name.RegisterAcronyms(cfg.Acronyms)
 
 	err = GenerateGoFromSQL(cfg.Schema, cfg.Dest, cfg.Package, cfg.IgnoreTables, cfg.CtxOnly)
 	if err != nil {
