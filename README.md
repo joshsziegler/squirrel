@@ -40,23 +40,26 @@ Please run `make pre-commit` before committing and especially before creating me
 
 ## To Do
 
-- [x] Signed numeric defaults and REAL/FLOAT defaults (e.g. `DEFAULT -100`, `DEFAULT +5`, `DEFAULT -1.5`, `DEFAULT 2.5e3`)
 - [ ] Defaults using expressions, such as `(datetime('now'))` or `(-5)`
 - [ ] Indices
-- [x] Multi-column `Unique` constraints (e.g. `UNIQUE (a, b)`)
 - [ ] Check constraints (e.g. `CHECK( type IN ('special', 'user-defined'))`)
-- [x] Named UNIQUE constraints (e.g. `CONSTRAINT uc_owner_channel UNIQUE (fk_owner_id, fk_channel_id)`)
 - [ ] Retain names on `PRIMARY KEY`, `FOREIGN KEY`, and `CHECK` constraints (currently dropped)
 - [ ] Named inline column constraints (e.g. `email TEXT CONSTRAINT uc_email UNIQUE`); inline `UNIQUE` is currently always unnamed
 - [ ] Add support for DB-provided timestamps such as `created_at`, `updated_at`, and `deleted_at`
 - [ ] Triggers
 - [ ] Add option to include or exclude rows that have been soft-deleted (i.e. `deleted_at`)
-- [x] Foreign key clauses spanning multiple lines (the `ON`, `MATCH`, and `DEFERRABLE` clauses may now wrap across lines)
-- [x] Multi-column (composite) foreign keys (e.g. `FOREIGN KEY (a, b) REFERENCES t (x, y)`)
 - [ ] Conflict clauses (e.g. `ON CONFLICT ...` on `NOT NULL`, `PRIMARY KEY`, `UNIQUE`, and foreign keys)
 - [ ] Generated/computed columns (e.g. `total AS (qty * price) STORED`)
 - [ ] `CREATE TABLE ... AS SELECT`
 - [ ] `COLLATE`, and `ASC`/`DESC` on columns and indexed columns
+- [ ] Reject identifiers that are reserved SQLite keywords (validation currently unused)
+
+## Done
+
+- [x] Signed numeric defaults and REAL/FLOAT defaults (e.g. `DEFAULT -100`, `DEFAULT +5`, `DEFAULT -1.5`, `DEFAULT 2.5e3`)
+- [x] Multi-column `Unique` constraints (e.g. `UNIQUE (a, b)`)
+- [x] Named UNIQUE constraints (e.g. `CONSTRAINT uc_owner_channel UNIQUE (fk_owner_id, fk_channel_id)`)
+- [x] Foreign key clauses spanning multiple lines (the `ON`, `MATCH`, and `DEFERRABLE` clauses may now wrap across lines)
+- [x] Multi-column (composite) foreign keys (e.g. `FOREIGN KEY (a, b) REFERENCES t (x, y)`)
 - [x] Alternative identifier quoting: `[name]` and `` `name` ``
 - [x] Quoted identifiers or string literals containing whitespace (e.g. `"first name"`, `DEFAULT 'in progress'`)
-- [ ] Reject identifiers that are reserved SQLite keywords (validation currently unused)
