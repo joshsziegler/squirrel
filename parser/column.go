@@ -14,7 +14,6 @@ type Column struct {
 	CompositePrimaryKey bool // True if this column is part of a composite primary key.
 	autoIncrement       bool // AutoIncrement is true if the this column explicitly specified AUTOINCREMENT. Use AutoIncrement()!
 	Nullable            bool
-	Unique              bool
 	Comment             string // Comment at the end of this column definition if provided.
 
 	// Default which can be a constant or expression and is type-dependent.

@@ -54,8 +54,9 @@ func TestParse(t *testing.T) {
 					goName:  "User",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: true, Unique: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: true},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"name"}}},
 				},
 			},
 		},
@@ -147,10 +148,11 @@ func TestParse(t *testing.T) {
 					sqlName: "bars",
 					goName:  "Bar",
 					Columns: []Column{
-						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false, Unique: true, Comment: "name of the bar"},
-						{sqlName: "open", goName: "Open", Type: INT, PrimaryKey: false, Nullable: true, Unique: false},
-						{sqlName: "close", goName: "Close", Type: INT, PrimaryKey: false, Nullable: true, Unique: false, Comment: "Hour (1-24) the bar closes if known"},
+						{sqlName: "name", goName: "Name", Type: TEXT, PrimaryKey: false, Nullable: false, Comment: "name of the bar"},
+						{sqlName: "open", goName: "Open", Type: INT, PrimaryKey: false, Nullable: true},
+						{sqlName: "close", goName: "Close", Type: INT, PrimaryKey: false, Nullable: true, Comment: "Hour (1-24) the bar closes if known"},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"name"}}},
 				},
 			},
 		},
@@ -194,9 +196,10 @@ func TestParse(t *testing.T) {
 					sqlName: "jobs",
 					goName:  "Job",
 					Columns: []Column{
-						{sqlName: "id", goName: "ID", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "id", goName: "ID", Type: TEXT, Nullable: false},
 						{sqlName: "user_id", goName: "UserID", Type: BLOB, Nullable: false},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"id"}}},
 				},
 			},
 		},
@@ -243,7 +246,7 @@ func TestParse(t *testing.T) {
 					goName:  "Product",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false},
 						{sqlName: "type", goName: "Type", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: "software"}},
 						{sqlName: "description", goName: "Description", Type: TEXT, Nullable: false, DefaultString: sql.NullString{Valid: true, String: ""}, Comment: "Empty string as the default"},
 						{sqlName: "discontinued", goName: "Discontinued", Type: BOOL, Nullable: false, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
@@ -252,6 +255,7 @@ func TestParse(t *testing.T) {
 						{sqlName: "stolen", goName: "Stolen", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
 						{sqlName: "intelligent", goName: "Intelligent", Type: BOOL, Nullable: true, DefaultBool: sql.NullBool{Valid: true, Bool: false}},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"name"}}},
 				},
 			},
 		},
@@ -277,8 +281,9 @@ func TestParse(t *testing.T) {
 					goName:  "Box",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"name"}}},
 				},
 				{
 					sqlName: "franchises",
@@ -292,7 +297,7 @@ func TestParse(t *testing.T) {
 					goName:  "Toy",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: false},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false},
 						{sqlName: "box_id", goName: "BoxID", Type: INT, Nullable: false},
 						{sqlName: "franchise_name", goName: "FranchiseName", Type: TEXT, Nullable: false},
 					},
@@ -394,7 +399,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			"single-column table-level UNIQUE sets the column's Unique flag",
+			"single-column table-level UNIQUE is recorded as a constraint",
 			`CREATE TABLE t (
 				id		INTEGER NOT NULL PRIMARY KEY,
 				email	TEXT NOT NULL,
@@ -407,8 +412,29 @@ func TestParse(t *testing.T) {
 					goName:  "T",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "email", goName: "Email", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "email", goName: "Email", Type: TEXT, Nullable: false},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"email"}}},
+				},
+			},
+		},
+		{
+			"named single-column UNIQUE constraint retains its name",
+			`CREATE TABLE t (
+				id		INTEGER NOT NULL PRIMARY KEY,
+				email	TEXT NOT NULL,
+				CONSTRAINT uc_email UNIQUE (email)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "t",
+					goName:  "T",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
+						{sqlName: "email", goName: "Email", Type: TEXT, Nullable: false},
+					},
+					UniqueConstraints: []UniqueConstraint{{Name: "uc_email", Columns: []string{"email"}}},
 				},
 			},
 		},
@@ -431,9 +457,12 @@ func TestParse(t *testing.T) {
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
 						{sqlName: "org_id", goName: "OrgID", Type: INT, Nullable: false},
 						{sqlName: "user_id", goName: "UserID", Type: INT, Nullable: false},
-						{sqlName: "slug", goName: "Slug", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "slug", goName: "Slug", Type: TEXT, Nullable: false},
 					},
-					UniqueConstraints: []UniqueConstraint{{Columns: []string{"org_id", "user_id"}}},
+					UniqueConstraints: []UniqueConstraint{
+						{Columns: []string{"slug"}},
+						{Columns: []string{"org_id", "user_id"}},
+					},
 				},
 			},
 		},
@@ -727,8 +756,9 @@ func TestParse(t *testing.T) {
 					goName:  "Parent",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false, Unique: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: false},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"name"}}},
 				},
 				{
 					sqlName: "children",
@@ -1117,7 +1147,7 @@ func TestParse(t *testing.T) {
 					goName:  "Child",
 					Columns: []Column{
 						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: false},
-						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: true, Unique: true, DefaultString: sql.NullString{Valid: true, String: "bob"}},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: true, DefaultString: sql.NullString{Valid: true, String: "bob"}},
 						// "check" is a quoted identifier, so it must be treated as a column name, NOT
 						// the CHECK keyword that the table-constraint dispatch looks for.
 						{sqlName: "check", goName: "Check", Type: TEXT, Nullable: false},
@@ -1126,6 +1156,7 @@ func TestParse(t *testing.T) {
 					ForeignKeys: []*ForeignKey{
 						{Table: "parents", LocalColumns: []string{"parent_id"}, Columns: []string{"id"}, OnDelete: Cascade},
 					},
+					UniqueConstraints: []UniqueConstraint{{Columns: []string{"name"}}},
 				},
 			},
 		},

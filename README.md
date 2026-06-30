@@ -47,6 +47,7 @@ Please run `make pre-commit` before committing and especially before creating me
 - [ ] Check constraints (e.g. `CHECK( type IN ('special', 'user-defined'))`)
 - [x] Named UNIQUE constraints (e.g. `CONSTRAINT uc_owner_channel UNIQUE (fk_owner_id, fk_channel_id)`)
 - [ ] Retain names on `PRIMARY KEY`, `FOREIGN KEY`, and `CHECK` constraints (currently dropped)
+- [ ] Named inline column constraints (e.g. `email TEXT CONSTRAINT uc_email UNIQUE`); inline `UNIQUE` is currently always unnamed
 - [ ] Add support for DB-provided timestamps such as `created_at`, `updated_at`, and `deleted_at`
 - [ ] Triggers
 - [ ] Add option to include or exclude rows that have been soft-deleted (i.e. `deleted_at`)

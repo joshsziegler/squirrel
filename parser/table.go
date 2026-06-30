@@ -16,13 +16,14 @@ type Table struct {
 	IfNotExists bool
 	Columns     []Column
 	ForeignKeys []*ForeignKey // ForeignKeys defined on this table (inline single-column and table-level, possibly composite).
-	// UniqueConstraints holds multi-column UNIQUE constraints. Single-column UNIQUE constraints are
-	// recorded on the column itself (Column.Unique).
+	// UniqueConstraints holds every UNIQUE constraint on the table, whether declared inline on a
+	// column or as a table-level constraint, and whether single- or multi-column. Use
+	// SingleColumnUnique to test individual-column uniqueness.
 	UniqueConstraints []UniqueConstraint
 	Comment           string // Comment at the end of the CREATE TABLE definition if provided.
 }
 
-// UniqueConstraint is a table-level multi-column UNIQUE constraint.
+// UniqueConstraint is a table-level UNIQUE constraint over one or more columns.
 type UniqueConstraint struct {
 	Name    string   // Name from a CONSTRAINT <name> prefix, or "" if unnamed.
 	Columns []string // The constrained columns, in the order declared.
@@ -102,18 +103,18 @@ func (t *Table) AddUniqueConstraint(name string, colNames []string) error {
 			return fmt.Errorf("UNIQUE constraint references unknown column %q", colName)
 		}
 	}
-	if len(colNames) == 1 {
-		for i := range t.Columns {
-			if t.Columns[i].SQLName() == colNames[0] {
-				t.Columns[i].Unique = true
-			}
-		}
-		// Single-column uniqueness is captured by the column's Unique flag; an optional constraint
-		// name is not retained for this case.
-		return nil
-	}
 	t.UniqueConstraints = append(t.UniqueConstraints, UniqueConstraint{Name: name, Columns: colNames})
 	return nil
+}
+
+// SingleColumnUnique reports whether the named column has a single-column UNIQUE constraint.
+func (t *Table) SingleColumnUnique(colName string) bool {
+	for _, uc := range t.UniqueConstraints {
+		if len(uc.Columns) == 1 && uc.Columns[0] == colName {
+			return true
+		}
+	}
+	return false
 }
 
 // hasColumn returns true if the table has a column with the given SQL name.

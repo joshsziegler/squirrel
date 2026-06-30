@@ -162,11 +162,12 @@ func columnToGo(w *ShortWriter, c *parser.Column, t *parser.Table) {
 	if c.CompositePrimaryKey {
 		commentParts = append(commentParts, "Composite PK")
 	}
-	if c.Unique {
+	if t.SingleColumnUnique(c.SQLName()) {
 		commentParts = append(commentParts, "Unique")
 	}
 	for _, uc := range t.UniqueConstraints {
-		if slices.Contains(uc.Columns, c.SQLName()) {
+		// Single-column constraints already surface via the "Unique" tag above.
+		if len(uc.Columns) > 1 && slices.Contains(uc.Columns, c.SQLName()) {
 			commentParts = append(commentParts, "Composite Unique")
 			break
 		}
@@ -376,7 +377,7 @@ func GetByPk(w *ShortWriter, t *parser.Table) {
 func GetByUnique(w *ShortWriter, t *parser.Table) {
 	for _, col := range t.Columns {
 		switch {
-		case !col.Unique:
+		case !t.SingleColumnUnique(col.SQLName()):
 			continue
 		case col.Nullable:
 			continue
