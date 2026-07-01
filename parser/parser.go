@@ -64,11 +64,13 @@ func removeQuotes(s string) string {
 	return s
 }
 
-// takeSignedNumber consumes an optional leading '+'/'-' sign followed by the next token, returning
-// them joined (e.g. "-100", "+2.5e3"). SQLite's DEFAULT clause allows a signed-number literal, and
-// the lexer emits the sign as a separate Operator token, so this reassembles it. If the next token
-// is not a sign, the single next token is returned unchanged (so callers can still detect NULL).
-func takeSignedNumber(tokens *Tokens) string {
+// takeDefaultValue consumes one scalar DEFAULT value token, returning its text. A DEFAULT value is
+// a single token -- a number, a string/blob literal, NULL, or a keyword such as CURRENT_TIMESTAMP --
+// except that a signed number is lexed as a separate '+'/'-' Operator token followed by the number,
+// which this reassembles (e.g. "-100", "+2.5e3"). If the next token is not a sign, the single next
+// token is returned unchanged (so callers can still detect NULL / a bare keyword). It does not
+// handle a parenthesized "( expr )" default; callers must check for '(' themselves.
+func takeDefaultValue(tokens *Tokens) string {
 	sign := ""
 	if tokens.Next() == "+" || tokens.Next() == "-" {
 		sign = tokens.Take()
@@ -274,7 +276,7 @@ func parseColumn(tokens *Tokens, strict bool) (parsedColumn, error) {
 			constraintName = "" // no model slot for a DEFAULT constraint name
 			switch c.Type {
 			case INT:
-				token := takeSignedNumber(tokens)
+				token := takeDefaultValue(tokens)
 				if !strings.EqualFold(token, "NULL") { // TODO: How to mark explicitly as DEFAULTS TO NULL?
 					val, err := strconv.ParseInt(token, 10, 64) // Should not have quotes
 					if err != nil {
@@ -283,7 +285,7 @@ func parseColumn(tokens *Tokens, strict bool) (parsedColumn, error) {
 					c.DefaultInt = sql.NullInt64{Valid: true, Int64: val}
 				}
 			case FLOAT:
-				token := takeSignedNumber(tokens)
+				token := takeDefaultValue(tokens)
 				if !strings.EqualFold(token, "NULL") {
 					val, err := strconv.ParseFloat(token, 64)
 					if err != nil {
@@ -502,15 +504,27 @@ func parseFkAction(tokens *Tokens, fk *ForeignKey) error {
 	return nil
 }
 
+// parseDatetimeDefault consumes a DATETIME/TIMESTAMP column's DEFAULT value (which the generator
+// currently ignores) without reading past it. Per SQLite's column-constraint grammar the value is
+// one of two shapes:
+//   - a bare literal or keyword -- NULL, CURRENT_TIMESTAMP, CURRENT_TIME, CURRENT_DATE, a number,
+//     or a string literal -- which is a single token (an optional leading +/- sign for a number is
+//     reassembled by takeDefaultValue), or
+//   - a parenthesized expression: ( expr ).
+//
+// The parenthesized branch stops when its parentheses balance OR on EOF, so a malformed/unterminated
+// default can never cause an infinite loop.
 func parseDatetimeDefault(tokens *Tokens) {
-	t := tokens.Take()
-	if strings.EqualFold(t, "NULL") {
-		log.Debug("[IGNORED] DateTime Default: NULL")
+	if tokens.Next() != "(" {
+		// Bare literal or keyword (e.g. CURRENT_TIMESTAMP, NULL, 0). A single token, except a
+		// signed number whose sign is lexed separately.
+		log.Debugf("[IGNORED] DateTime Default: %s\n", takeDefaultValue(tokens))
 		return
 	}
 	value := []string{}
 	paren := 0
-	for {
+	for tokens.NextType() != EOF {
+		t := tokens.Take()
 		if t == "(" {
 			paren += 1
 		} else if t == ")" {
@@ -522,7 +536,6 @@ func parseDatetimeDefault(tokens *Tokens) {
 			// ignore
 			value = append(value, t)
 		}
-		t = tokens.Take()
 	}
 	log.Debugf("[IGNORED] DateTime Default: %s\n", strings.Join(value, " "))
 }
@@ -581,7 +594,9 @@ func parseColumnList(tokens *Tokens) []string {
 	cols := []string{}
 	t := tokens.Next()
 	for {
-		if t == ")" { // End of column list
+		if tokens.NextType() == EOF { // Unterminated list; stop rather than spin on EOF.
+			break
+		} else if t == ")" { // End of column list
 			tokens.Take()
 			break
 		} else if t == "," { // Column Separator

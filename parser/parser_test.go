@@ -3,6 +3,7 @@ package parser
 import (
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1394,6 +1395,73 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Bare (non-parenthesized) datetime DEFAULT keywords are consumed as a single token; a
+			// following column must NOT be swallowed. Previously CURRENT_TIMESTAMP ran off the end
+			// of the column definition.
+			"bare datetime DEFAULT keyword does not swallow following columns",
+			`CREATE TABLE events (
+				id			INTEGER PRIMARY KEY,
+				created_at	DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at	DATETIME DEFAULT CURRENT_DATE,
+				name		TEXT
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "events",
+					goName:  "Event",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
+						{sqlName: "created_at", goName: "CreatedAt", Type: DATETIME, Nullable: true},
+						{sqlName: "updated_at", goName: "UpdatedAt", Type: DATETIME, Nullable: true},
+						{sqlName: "name", goName: "Name", Type: TEXT, Nullable: true},
+					},
+				},
+			},
+		},
+		{
+			// A bare datetime DEFAULT followed by a column with a parenthesized CHECK previously
+			// caused the CHECK's ')' to terminate the default scan, silently swallowing the whole
+			// "amount" column. Verify the column and its CHECK survive.
+			"bare datetime DEFAULT before a CHECK column keeps that column",
+			`CREATE TABLE events (
+				created_at	DATETIME DEFAULT CURRENT_TIMESTAMP,
+				amount		INTEGER CHECK (amount > 0)
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "events",
+					goName:  "Event",
+					Columns: []Column{
+						{sqlName: "created_at", goName: "CreatedAt", Type: DATETIME, Nullable: true},
+						{sqlName: "amount", goName: "Amount", Type: INT, Nullable: true},
+					},
+					CheckConstraints: []CheckConstraint{{Name: "", Expr: "amount > 0"}},
+				},
+			},
+		},
+		{
+			// Bare datetime DEFAULT as the final column, with a trailing constraint after it, was
+			// the infinite-hang case. It must now parse cleanly.
+			"bare datetime DEFAULT as final column with trailing NOT NULL",
+			`CREATE TABLE events (
+				id			INTEGER PRIMARY KEY,
+				created_at	DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+			)`,
+			false,
+			[]*Table{
+				{
+					sqlName: "events",
+					goName:  "Event",
+					Columns: []Column{
+						{sqlName: "id", goName: "ID", Type: INT, PrimaryKey: true, Nullable: true},
+						{sqlName: "created_at", goName: "CreatedAt", Type: DATETIME, Nullable: false},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1404,6 +1472,44 @@ func TestParse(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got, "%+v", got)
+		})
+	}
+}
+
+// TestParseTerminates guards against the infinite-loop bugs that a bare (non-parenthesized)
+// datetime DEFAULT and an unterminated column list previously triggered. Each input is parsed on a
+// background goroutine; if Parse fails to return before the deadline it has regressed into a hang,
+// so the test fails instead of hanging the whole suite. The parse result is irrelevant here -- these
+// inputs may be well-formed or malformed; the only property under test is that Parse always returns.
+func TestParseTerminates(t *testing.T) {
+	inputs := map[string]string{
+		"bare datetime DEFAULT as last column": `CREATE TABLE events (
+			id			INTEGER PRIMARY KEY,
+			created_at	DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+		"bare datetime DEFAULT followed by more tables": `CREATE TABLE events (
+			created_at	DATETIME DEFAULT CURRENT_TIMESTAMP,
+			name		TEXT
+		);
+		CREATE TABLE other ( id INTEGER )`,
+		"unterminated table-level column list": `CREATE TABLE foo (
+			id INTEGER,
+			PRIMARY KEY (id, name`,
+		"unterminated parenthesized datetime DEFAULT": `CREATE TABLE foo (
+			created_at DATETIME DEFAULT (datetime('now')`,
+	}
+	for name, sql := range inputs {
+		t.Run(name, func(t *testing.T) {
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				_, _ = Parse(sql)
+			}()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				t.Fatal("Parse did not terminate within 5s; likely an infinite loop")
+			}
 		})
 	}
 }
